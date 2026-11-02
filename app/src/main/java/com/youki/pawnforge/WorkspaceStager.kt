@@ -80,7 +80,8 @@ class WorkspaceStager(
     private fun safeName(value: String): String {
         val name = buildString {
             value.forEach { character ->
-                if (character == '/' || character == '\\\\' || character < ' ' || character == '\\u007f') {
+                // Remove path separators and control characters from document display names.
+                if (character == '/' || character.code == 92 || character.code < 32 || character.code == 127) {
                     append('_')
                 } else {
                     append(character)
