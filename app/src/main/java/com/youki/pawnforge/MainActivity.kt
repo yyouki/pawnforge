@@ -200,17 +200,19 @@ public OnPlayerConnect(playerid)
     private fun applySystemBarInsets(root: View) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
 
-        // Reserve the status/navigation bars and display cutout without hiding system indicators.
+        // Explicitly opt into edge-to-edge; keep the OS status/navigation indicators visible.
+        window.setDecorFitsSystemWindows(false)
+
         root.setOnApplyWindowInsetsListener { view, insets ->
-            val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                insets.displayCutout
-            } else {
-                null
-            }
-            val left = maxOf(insets.systemWindowInsetLeft, cutout?.safeInsetLeft ?: 0)
-            val top = maxOf(insets.systemWindowInsetTop, cutout?.safeInsetTop ?: 0)
-            val right = maxOf(insets.systemWindowInsetRight, cutout?.safeInsetRight ?: 0)
-            val bottom = maxOf(insets.systemWindowInsetBottom, cutout?.safeInsetBottom ?: 0)
+            // Use the modern inset types instead of deprecated systemWindowInset fields.
+            val systemBars = insets.getInsets(WindowInsets.Type.systemBars())
+            val cutout = insets.displayCutout
+            val left = maxOf(systemBars.left, cutout?.safeInsetLeft ?: 0)
+            val top = maxOf(systemBars.top, cutout?.safeInsetTop ?: 0)
+            val right = maxOf(systemBars.right, cutout?.safeInsetRight ?: 0)
+            val bottom = maxOf(systemBars.bottom, cutout?.safeInsetBottom ?: 0)
+
+            // Keep all app controls inside the usable screen area.
             view.setPadding(left, top, right, bottom)
             insets
         }
