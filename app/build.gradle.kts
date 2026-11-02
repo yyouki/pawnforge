@@ -3,17 +3,29 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Release bundles are signed only when the upload-key secrets are configured in CI or locally.
+val releaseStoreFile = System.getenv("PAWNFORGE_RELEASE_STORE_FILE")
+val releaseStorePassword = System.getenv("PAWNFORGE_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("PAWNFORGE_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("PAWNFORGE_RELEASE_KEY_PASSWORD")
+val releaseSigningReady = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.youki.pawnforge"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.youki.pawnforge"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        targetSdk = 36
+        versionCode = 4
+        versionName = "0.4.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -47,8 +59,22 @@ android {
         jvmTarget = "17"
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseSigningReady) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
