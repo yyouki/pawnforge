@@ -615,9 +615,27 @@ public OnPlayerConnect(playerid)
                     )
                 }
 
+                // Always return the edited source to the selected folder; export AMX only on success.
+                val exportResult = result.mapCatching { compileResult ->
+                    val filesToExport = buildList {
+                        if (sourceFile.isFile) add(sourceFile)
+                        if (compileResult.exitCode == 0 && compileResult.outputFile.isFile) {
+                            add(compileResult.outputFile)
+                        }
+                    }
+                    val selectedFolder = workspaceTreeUri
+                        ?: throw IllegalStateException("Original project folder access is not available.")
+                    WorkspaceExporter(contentResolver).exportFiles(
+                        treeUri = selectedFolder,
+                        workspaceRoot = root,
+                        files = filesToExport
+                    )
+                }
+
                 runOnUiThread {
                     result.onSuccess { compileResult ->
                         val success = compileResult.exitCode == 0 && compileResult.outputFile.isFile
+                        val exported = exportResult.isSuccess
                         logView.text = buildString {
                             append(compileResult.output)
                             if (compileResult.output.isNotBlank() && !compileResult.output.endsWith("\n")) appendLine()
@@ -625,14 +643,28 @@ public OnPlayerConnect(playerid)
                             if (success) {
                                 appendLine("BUILD SUCCEEDED")
                                 appendLine("AMX: ${compileResult.outputFile.absolutePath}")
+                                if (exported) {
+                                    appendLine("Source and AMX exported to the selected project folder.")
+                                } else {
+                                    appendLine("EXPORT WARNING: compilation succeeded, but copying files back failed.")
+                                    appendLine(exportResult.exceptionOrNull()?.message ?: "Unknown export error.")
+                                    appendLine("The files remain in the app's staged workspace.")
+                                }
                             } else {
                                 appendLine("BUILD FAILED")
                                 appendLine("Compiler exit code: ${compileResult.exitCode}")
                                 if (!compileResult.outputFile.exists()) appendLine("No AMX output file was produced.")
+                                if (exported) appendLine("Edited source was copied back to the selected project folder.")
+                                else appendLine("Source export warning: ${exportResult.exceptionOrNull()?.message ?: "unknown error"}")
                             }
                         }
-                        statusView.text = if (success) "Compile successful: ${outputFile.name}" else "Compile failed — inspect diagnostics."
-                        if (success) toast("AMX generated: ${outputFile.name}")
+                        statusView.text = when {
+                            success && exported -> "Compile successful: ${outputFile.name}"
+                            success -> "Compiled; export warning."
+                            else -> "Compile failed — inspect diagnostics."
+                        }
+                        if (success && exported) toast("AMX generated and exported: ${outputFile.name}")
+                        else if (success) toast("AMX generated; export failed.")
                     }.onFailure { error ->
                         logView.text = "Compiler invocation failed.\n${error.message ?: error.javaClass.simpleName}"
                         statusView.text = "Compiler invocation failed."
