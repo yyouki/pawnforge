@@ -30,6 +30,7 @@ class PawnNativeCompilerSmokeTest {
             )
         }
         val output = File(workspace, "output/main.amx")
+        check(output.parentFile?.mkdirs() == true) { "Could not create output directory." }
         val logFile = File(context.cacheDir, "pawn-native-smoke.log")
         val temporaryDirectory = File(context.cacheDir, "pawn-native-smoke-tmp")
 
@@ -47,8 +48,7 @@ class PawnNativeCompilerSmokeTest {
             outputFile = output
         )
 
-        assertEquals("Pawn compiler log:
-${result.output}", 0, result.exitCode)
+        assertEquals("Pawn compiler failed. Log: " + result.output, 0, result.exitCode)
         assertTrue("Compiler did not create the AMX output file.", output.isFile)
         assertTrue("Compiler generated an empty AMX file.", output.length() > 0)
     }
