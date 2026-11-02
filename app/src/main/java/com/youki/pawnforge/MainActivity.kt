@@ -7,6 +7,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.text.Editable
 import android.text.Spanned
@@ -15,6 +16,7 @@ import android.text.style.ForegroundColorSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import android.widget.EditText
@@ -72,9 +74,18 @@ public OnPlayerConnect(playerid)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        window.statusBarColor = Color.BLACK
-        window.navigationBarColor = Color.rgb(32, 45, 67)
+        // Keep the clock, connectivity and battery indicators visible.
         window.decorView.systemUiVisibility = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            // Android 15+ enforces edge-to-edge for apps targeting API 35 or newer.
+            window.statusBarColor = Color.TRANSPARENT
+            window.navigationBarColor = Color.TRANSPARENT
+            window.isStatusBarContrastEnforced = false
+            window.isNavigationBarContrastEnforced = false
+        } else {
+            window.statusBarColor = Color.rgb(10, 76, 174)
+            window.navigationBarColor = Color.rgb(32, 45, 67)
+        }
 
         // Restore the user-selected workspace and custom include directories.
         val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
@@ -87,7 +98,8 @@ public OnPlayerConnect(playerid)
     private fun buildInterface() {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.rgb(205, 205, 205))
+            // This color is visible behind transparent system bars on Android 15+.
+            setBackgroundColor(Color.rgb(10, 76, 174))
         }
 
         root.addView(buildTitleBar(), verticalParams(48))
@@ -182,6 +194,27 @@ public OnPlayerConnect(playerid)
         root.addView(buildBottomNavigation(), verticalParams(58))
 
         setContentView(root)
+        applySystemBarInsets(root)
+    }
+
+    private fun applySystemBarInsets(root: View) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
+
+        // Reserve the status/navigation bars and display cutout without hiding system indicators.
+        root.setOnApplyWindowInsetsListener { view, insets ->
+            val cutout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                insets.displayCutout
+            } else {
+                null
+            }
+            val left = maxOf(insets.systemWindowInsetLeft, cutout?.safeInsetLeft ?: 0)
+            val top = maxOf(insets.systemWindowInsetTop, cutout?.safeInsetTop ?: 0)
+            val right = maxOf(insets.systemWindowInsetRight, cutout?.safeInsetRight ?: 0)
+            val bottom = maxOf(insets.systemWindowInsetBottom, cutout?.safeInsetBottom ?: 0)
+            view.setPadding(left, top, right, bottom)
+            insets
+        }
+        root.requestApplyInsets()
     }
 
     private fun buildTitleBar(): View {
@@ -948,7 +981,7 @@ public OnPlayerConnect(playerid)
 
     private fun showAbout() {
         AlertDialog.Builder(this)
-            .setTitle("PawnForge 0.3.0")
+            .setTitle("PawnForge 0.4.0")
             .setMessage(
                 "PawnForge is an Android Pawn editor and native compiler inspired by Pawno/Qawno.\n\n" +
                     "Pawn Community Compiler 3.10.10 is bundled for arm64-v8a, armeabi-v7a, and x86_64. " +
