@@ -4,11 +4,8 @@ import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
 class PawnIncludePathsTest {
-    private val temporaryFolder = TemporaryFolder()
-
     @Test
     fun projectRootAndGamemodeAreCompilerIncludePaths() {
         val root = createProject()
