@@ -23,10 +23,15 @@ Implemented:
 Not implemented yet:
 - The Pawn compiler executable/library for Android.
 - Real compilation and .amx output.
-- Staging the selected SAF workspace into app-private storage for native compilation.
+- SAF workspace staging that preserves nested project folders in app-private storage.
+- Pawn compiler argument builder with repeated `-i<directory>` entries and output-file handling.
 - Full multi-file project explorer and editor undo/redo.
 
 The Compile action intentionally reports that the compiler engine is missing. It does not fabricate a successful build or create a fake .amx file.
+
+## Include handling
+
+PawnForge adds the workspace root and common `pawno/include`, `qawno/include`, `include`, `includes`, and `gamemode` directories to the Pawn compiler include search list. See [docs/INCLUDE_PATHS.md](docs/INCLUDE_PATHS.md) for quoted and angle-bracket include examples. Workspace selection, staging, and argument construction are implemented; real compilation and compile diagnostics remain pending until the native Pawn compiler engine is integrated.
 
 ## Build
 
