@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -48,9 +49,15 @@ class SystemBarsCompatibilityTest {
             }
 
             if (Build.VERSION.SDK_INT >= 35) {
+                val rootInsets = root.rootWindowInsets
+                assertTrue("The root view must receive window insets.", rootInsets != null)
+                val actualStatusBarInset = rootInsets!!.getInsets(
+                    WindowInsets.Type.statusBars()
+                ).top
+                assertTrue("The system must report a visible status-bar inset.", actualStatusBarInset > 0)
                 assertTrue(
-                    "Edge-to-edge layout must reserve the status-bar inset.",
-                    root.paddingTop >= statusBarHeight && root.paddingTop > 0
+                    "Edge-to-edge layout must reserve the actual status-bar inset.",
+                    root.paddingTop >= actualStatusBarInset
                 )
             } else {
                 val location = IntArray(2)
