@@ -30,6 +30,34 @@ class PawnIncludePathsTest {
         assertEquals(listOf("gamemode", "custom/inc"), sanitized)
     }
 
+
+    @Test
+    fun compilerCommandIncludesProjectPathsAndOutput() {
+        val root = createProject()
+        val sourceDir = File(root, "gamemodes").apply { mkdirs() }
+        File(root, "gamemode").mkdirs()
+        File(root, "include").mkdirs()
+        val source = File(sourceDir, "main.pwn").apply { writeText("main() {}") }
+        val output = File(root, "output/main.amx")
+
+        val arguments = PawnCompilerCommand.buildArguments(
+            PawnCompileRequest(
+                sourceFile = source,
+                workspaceRoot = root,
+                outputFile = output,
+                customIncludePaths = listOf("gamemode", "include")
+            )
+        )
+
+        assertTrue(arguments.contains("-i" + File(root, "gamemode").absolutePath))
+        assertTrue(arguments.contains("-i" + File(root, "include").absolutePath))
+        assertTrue(arguments.contains("-Z"))
+        assertTrue(arguments.contains("-O2"))
+        assertTrue(arguments.contains("-o" + output.absolutePath))
+        assertEquals(source.absolutePath, arguments.last())
+        assertTrue(output.parentFile?.isDirectory == true)
+    }
+
     private fun createProject(): File = File(
         System.getProperty("java.io.tmpdir"),
         "pawnforge-test-${System.nanoTime()}"
