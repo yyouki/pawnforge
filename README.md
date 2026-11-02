@@ -6,6 +6,8 @@ PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode develop
 
 ![PawnForge logo](branding/pawnforge-logo.svg)
 
+The logo artwork intentionally contains only the pawn symbol and PawnForge wordmark.
+
 Android launcher and title bar use the matching vector logo from `app/src/main/res/drawable/ic_pawnforge_logo.xml`.
 
 ## Current milestone: Android IDE shell
