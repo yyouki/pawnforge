@@ -1,13 +1,47 @@
 # PawnForge
 
-PawnForge is an Android-first Pawn editor and compiler frontend inspired by the classic Pawno/Qawno interface for SA-MP and open.mp gamemode development.
+PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode development. Its interface intentionally follows the classic Pawno/Qawno desktop layout.
 
-## Project status
+## Current milestone: Android IDE shell
 
-The first milestone is the Android IDE shell: classic toolbar/menu layout, editable Pawn source, syntax coloring, file open/save, project navigation, and compiler/output panels.
+Implemented:
+- Classic blue title bar, File/Edit/Search/Build/Options/Help menu, and toolbar.
+- Pawn source editor with monospaced text, line-number gutter, and basic syntax coloring.
+- Open and save source files through Android's Storage Access Framework.
+- Compiler and Output tabs with honest engine status.
+- Project, Settings, and About navigation panels.
+- GitHub Actions workflow that builds and uploads a debug APK.
 
-The Pawn compiler engine is **not integrated yet**. The UI must not report successful compilation until a real compiler binary has been built for Android and wired into the app.
+Not implemented yet:
+- The Pawn compiler executable/library for Android.
+- Real compilation and .amx output.
+- Include-directory management and project workspace persistence.
+- Full multi-file project explorer and editor undo/redo.
+
+The Compile action intentionally reports that the compiler engine is missing. It does not fabricate a successful build or create a fake .amx file.
 
 ## Build
 
-Open this repository in Android Studio, or run `gradle :app:assembleDebug` with Gradle 8.9 and JDK 17. A GitHub Actions workflow builds the debug APK on pushes to `main`.
+Requirements:
+- JDK 17
+- Android SDK Platform 35
+- Gradle 8.9
+
+Run the following command:
+
+    gradle --no-daemon :app:assembleDebug
+
+APK output:
+
+    app/build/outputs/apk/debug/app-debug.apk
+
+Every push to main triggers the Android APK workflow. Download the artifact named pawnforge-debug-apk from the successful workflow run.
+
+## Project structure
+
+    app/
+      src/main/
+        java/com/youki/pawnforge/MainActivity.kt
+        res/values/
+        AndroidManifest.xml
+    .github/workflows/android.yml
