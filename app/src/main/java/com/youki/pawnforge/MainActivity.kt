@@ -545,7 +545,7 @@ public OnPlayerConnect(playerid)
         applyPattern(editable, Regex("\\b(public|stock|new|const|static|forward|native|return|if|else|for|while|switch|case|break|continue|sizeof|default)\\b"), Color.rgb(0, 45, 220))
         applyPattern(editable, Regex("\\b0[xX][0-9A-Fa-f]+|\\b[0-9]+\\b"), Color.rgb(190, 25, 35))
         applyPattern(editable, Regex("#[A-Za-z_]+"), Color.rgb(65, 45, 210))
-        applyPattern(editable, Regex(""(?:\\\\.|[^"\\\\])*""), Color.rgb(20, 120, 40))
+        applyPattern(editable, Regex("[\\x22][^\\x22]*[\\x22]"), Color.rgb(20, 120, 40))
         applyPattern(editable, Regex("//[^\\n]*"), Color.rgb(120, 120, 120))
     }
 
