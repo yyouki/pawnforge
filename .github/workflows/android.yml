@@ -43,6 +43,13 @@ jobs:
       - name: Run unit tests and build APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
 
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnforge-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
       - name: Run native compiler smoke test
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
@@ -50,10 +57,3 @@ jobs:
           arch: x86_64
           target: google_apis
           script: gradle --no-daemon :app:connectedDebugAndroidTest
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: pawnforge-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
