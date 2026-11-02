@@ -24,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.io.File
 
 class MainActivity : Activity() {
 
@@ -37,6 +38,7 @@ class MainActivity : Activity() {
 
     private var currentUri: Uri? = null
     private var workspaceTreeUri: Uri? = null
+    private var stagedWorkspace: File? = null
     private var customIncludePaths = ""
     private var activeFileName = "gamemode.pwn"
     private var showingCompiler = true
@@ -501,11 +503,12 @@ public OnPlayerConnect(playerid)
     private fun showProjects() {
         AlertDialog.Builder(this)
             .setTitle("Projects — ${workspaceLabel()}")
-            .setItems(arrayOf("Choose project folder", "Open .pwn / .inc file", "Configure include directories")) { _, which ->
+            .setItems(arrayOf("Choose project folder", "Prepare workspace for compiler", "Open .pwn / .inc file", "Configure include directories")) { _, which ->
                 when (which) {
                     0 -> chooseWorkspaceFolder()
-                    1 -> openDocument()
-                    2 -> showIncludePathsDialog()
+                    1 -> stageWorkspace()
+                    2 -> openDocument()
+                    3 -> showIncludePathsDialog()
                 }
             }
             .setNegativeButton("Close", null)
@@ -524,6 +527,55 @@ public OnPlayerConnect(playerid)
             }
             .setNegativeButton("Close", null)
             .show()
+    }
+
+    private fun stageWorkspace() {
+        val selectedTree = workspaceTreeUri
+        if (selectedTree == null) {
+            toast("Choose a project folder first.")
+            chooseWorkspaceFolder()
+            return
+        }
+
+        statusView.text = "Preparing project workspace..."
+        logView.text = "Copying project files while preserving folders..."
+
+        // SAF copying is done off the UI thread so large gamemodes do not freeze the editor.
+        Thread {
+            val result = runCatching {
+                WorkspaceStager(contentResolver, filesDir).stage(selectedTree)
+            }
+
+            runOnUiThread {
+                result.onSuccess { stagedRoot ->
+                    stagedWorkspace = stagedRoot
+                    val directories = PawnIncludePaths.existingDirectories(
+                        workspaceRoot = stagedRoot,
+                        customRelativePaths = customIncludePaths.lines()
+                    )
+                    logView.text = buildString {
+                        appendLine("Workspace prepared for Pawn compilation.")
+                        appendLine("Project: ${stagedRoot.name}")
+                        appendLine("Staged path: ${stagedRoot.absolutePath}")
+                        appendLine()
+                        appendLine("Resolved include search directories:")
+                        directories.forEach { appendLine("  -i${it.absolutePath}") }
+                        appendLine()
+                        appendLine("Nested folders are preserved, including gamemode/.")
+                        appendLine("Quoted includes resolve relative to their containing source file.")
+                        appendLine("Angle-bracket includes use the -i directories above.")
+                        appendLine()
+                        appendLine("No compile was run: native Pawn Compiler is not integrated yet.")
+                    }
+                    statusView.text = "Workspace prepared: ${stagedRoot.name}"
+                    toast("Workspace prepared.")
+                }.onFailure { error ->
+                    logView.text = "Workspace preparation failed:\\n${error.message ?: "unknown error"}"
+                    statusView.text = "Workspace preparation failed."
+                    toast("Could not prepare workspace.")
+                }
+            }
+        }.start()
     }
 
     private fun chooseWorkspaceFolder() {
