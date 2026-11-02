@@ -12,8 +12,9 @@ android {
         applicationId = "com.youki.pawnforge"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -57,15 +58,24 @@ android {
     }
 }
 
-val stagePawnCompilerIncludes by tasks.registering(Sync::class) {
-    from(rootProject.file("third_party/pawn-compiler-android/include"))
-    into(layout.buildDirectory.dir("generated/pawnCompilerAssets/pawn-compiler/include"))
+val stagePawnCompilerResources by tasks.registering(Sync::class) {
+    into(layout.buildDirectory.dir("generated/pawnCompilerAssets"))
+    from(rootProject.file("third_party/pawn-compiler-android/include")) {
+        into("pawn-compiler/include")
+    }
+    from(rootProject.file("third_party/pawn-compiler-android/license.txt")) {
+        into("pawn-compiler")
+        rename { "LICENSE.txt" }
+    }
 }
 
 tasks.named("preBuild").configure {
-    dependsOn(stagePawnCompilerIncludes)
+    dependsOn(stagePawnCompilerResources)
 }
 
 dependencies {
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test:rules:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
 }
