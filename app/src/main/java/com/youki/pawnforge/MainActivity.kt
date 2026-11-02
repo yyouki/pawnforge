@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private var currentUri: Uri? = null
     private var workspaceTreeUri: Uri? = null
     private var stagedWorkspace: File? = null
+    private var currentSourceFile: File? = null
     private var customIncludePaths = ""
     private var activeFileName = "gamemode.pwn"
     private var showingCompiler = true
@@ -372,6 +373,7 @@ public OnPlayerConnect(playerid)
     private fun newFile() {
         activeFileName = "gamemode.pwn"
         currentUri = null
+        currentSourceFile = null
         editor.setText(PAWN_SAMPLE)
         updateTitle()
         statusView.text = "New file created."
@@ -387,12 +389,20 @@ public OnPlayerConnect(playerid)
     }
 
     private fun saveDocument() {
-        val uri = currentUri
-        if (uri == null) {
-            saveDocumentAs()
-        } else {
-            writeToUri(uri)
+        val stagedFile = currentSourceFile
+        if (stagedFile != null) {
+            try {
+                stagedFile.writeText(editor.text.toString(), Charsets.UTF_8)
+                statusView.text = "Saved: $activeFileName"
+                toast("Project file saved.")
+            } catch (error: Exception) {
+                toast("Save failed: ${error.message ?: "unknown error"}")
+            }
+            return
         }
+
+        val uri = currentUri
+        if (uri == null) saveDocumentAs() else writeToUri(uri)
     }
 
     private fun saveDocumentAs() {
@@ -419,6 +429,7 @@ public OnPlayerConnect(playerid)
                         ?: throw IllegalStateException("File could not be read.")
 
                     currentUri = uri
+                    currentSourceFile = null
                     activeFileName = uri.lastPathSegment?.substringAfterLast('/') ?: "untitled.pwn"
                     editor.setText(content)
                     updateTitle()
@@ -429,6 +440,7 @@ public OnPlayerConnect(playerid)
             }
             REQUEST_SAVE_FILE -> {
                 currentUri = uri
+                currentSourceFile = null
                 writeToUri(uri)
             }
             REQUEST_OPEN_WORKSPACE -> {
@@ -471,44 +483,228 @@ public OnPlayerConnect(playerid)
         showingCompiler = true
         refreshPanel()
 
-        // Never claim success until the real Pawn compiler is bundled and executed.
-        logView.text = buildString {
-            appendLine("PawnForge — Build")
-            appendLine()
-            appendLine("Input:  $activeFileName")
-            appendLine("Workspace: ${workspaceLabel()}")
-            appendLine("Target: SA-MP / open.mp")
-            appendLine("Output: .amx")
-            appendLine()
-            appendLine("Configured include search directories:")
-            val paths = configuredIncludePaths()
-            paths.forEach { appendLine("  -i<workspace-root>/$it") }
-            appendLine()
-            appendLine("Quoted include example:")
-            appendLine("  #include \"gamemode/player.inc\"")
-            appendLine("  Resolved relative to the file containing the directive.")
-            appendLine()
-            appendLine("Angle-bracket include example:")
-            appendLine("  #include <gamemode/player.inc>")
-            appendLine("  Found through the project-root -i search path.")
-            appendLine()
-            appendLine("Compiler engine is not integrated yet.")
-            appendLine("No .amx file was generated; no compile diagnostics are available yet.")
-            appendLine()
-            appendLine("Planned Android ABIs: arm64-v8a, armeabi-v7a, x86_64, x86")
+        val root = stagedWorkspace
+        if (root == null || !root.isDirectory) {
+            logView.text = "No staged project workspace.\n\nOpen Projects > Choose project folder, then Prepare workspace for compiler."
+            statusView.text = "Project workspace required."
+            showProjects()
+            return
         }
-        statusView.text = "Build not started — compiler engine missing."
+
+        val selected = currentSourceFile?.let { file ->
+            runCatching {
+                val canonicalRoot = root.canonicalPath
+                val canonicalFile = file.canonicalPath
+                file.isFile && canonicalFile.startsWith(canonicalRoot + File.separator)
+            }.getOrDefault(false).let { inside -> if (inside) file else null }
+        }
+
+        if (selected != null) {
+            compileStagedSource(root, selected)
+        } else {
+            showProjectSourcePicker(compileAfterSelection = true)
+        }
+    }
+
+    private fun showProjectSourcePicker(compileAfterSelection: Boolean) {
+        val root = stagedWorkspace
+        if (root == null || !root.isDirectory) {
+            toast("Prepare a project workspace first.")
+            return
+        }
+
+        val sources = findPawnSources(root)
+        if (sources.isEmpty()) {
+            logView.text = "No .pwn, .pawn, or .p source files were found in this workspace."
+            statusView.text = "No Pawn source files found."
+            return
+        }
+
+        val labels = sources.map { file ->
+            root.toPath().relativize(file.toPath()).toString().replace(File.separatorChar, '/')
+        }.toTypedArray()
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Pawn source")
+            .setItems(labels) { _, which ->
+                val selected = sources[which]
+                openStagedSource(selected)
+                if (compileAfterSelection) compileStagedSource(root, selected)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun findPawnSources(root: File): List<File> {
+        val results = mutableListOf<File>()
+        val excludedFolders = setOf(".git", "build", ".gradle", "output")
+
+        fun visit(directory: File) {
+            directory.listFiles()
+                ?.sortedBy { it.name.lowercase() }
+                ?.forEach { child ->
+                    when {
+                        child.isDirectory && child.name !in excludedFolders -> visit(child)
+                        child.isFile && child.extension.lowercase() in setOf("pwn", "pawn", "p") ->
+                            results.add(child)
+                    }
+                }
+        }
+
+        visit(root)
+        return results.sortedBy { it.relativeTo(root).path.lowercase() }
+    }
+
+    private fun openStagedSource(sourceFile: File) {
+        try {
+            editor.setText(sourceFile.readText(Charsets.UTF_8))
+            currentSourceFile = sourceFile
+            currentUri = null
+            activeFileName = sourceFile.name
+            updateTitle()
+            statusView.text = "Opened project source: $activeFileName"
+        } catch (error: Exception) {
+            toast("Could not open source: \${error.message ?: "unknown error"}")
+        }
+    }
+
+    private fun compileStagedSource(root: File, sourceFile: File) {
+        try {
+            // Compile the editor buffer, not an older copy left on disk.
+            if (currentSourceFile?.canonicalFile == sourceFile.canonicalFile) {
+                sourceFile.writeText(editor.text.toString(), Charsets.UTF_8)
+            }
+
+            val builtInIncludes = ensureCompilerIncludes()
+            val outputDirectory = File(root, "output")
+            val outputFile = File(outputDirectory, sourceFile.nameWithoutExtension + ".amx")
+            val request = PawnCompileRequest(
+                sourceFile = sourceFile,
+                workspaceRoot = root,
+                outputFile = outputFile,
+                customIncludePaths = customIncludePaths.lines(),
+                extraIncludeDirectories = listOf(builtInIncludes),
+                compilerFlags = listOf("-Z", "-O2")
+            )
+            val arguments = listOf("pawncc") + PawnCompilerCommand.buildArguments(request)
+            val logFile = File(cacheDir, "pawnforge-compiler.log")
+            val temporaryDirectory = File(cacheDir, "pawn-tmp")
+
+            logView.text = buildString {
+                appendLine("Pawn Community Compiler 3.10.10")
+                appendLine("Source: \${sourceFile.relativeTo(root).path}")
+                appendLine("Target: SA-MP / open.mp")
+                appendLine("Output: \${outputFile.relativeTo(root).path}")
+                appendLine()
+                appendLine("Compiler arguments:")
+                arguments.drop(1).forEach { appendLine("  $it") }
+                appendLine()
+                appendLine("Compiling...")
+            }
+            statusView.text = "Compiling $activeFileName..."
+
+            // Run the native compiler off the UI thread; native output is captured to a log file.
+            Thread {
+                val result = runCatching {
+                    PawnNativeCompiler.compile(
+                        arguments = arguments,
+                        logFile = logFile,
+                        temporaryDirectory = temporaryDirectory,
+                        workingDirectory = root,
+                        outputFile = outputFile
+                    )
+                }
+
+                runOnUiThread {
+                    result.onSuccess { compileResult ->
+                        val success = compileResult.exitCode == 0 && compileResult.outputFile.isFile
+                        logView.text = buildString {
+                            append(compileResult.output)
+                            if (compileResult.output.isNotBlank() && !compileResult.output.endsWith("\n")) appendLine()
+                            appendLine()
+                            if (success) {
+                                appendLine("BUILD SUCCEEDED")
+                                appendLine("AMX: \${compileResult.outputFile.absolutePath}")
+                            } else {
+                                appendLine("BUILD FAILED")
+                                appendLine("Compiler exit code: \${compileResult.exitCode}")
+                                if (!compileResult.outputFile.exists()) appendLine("No AMX output file was produced.")
+                            }
+                        }
+                        statusView.text = if (success) "Compile successful: \${outputFile.name}" else "Compile failed — inspect diagnostics."
+                        if (success) toast("AMX generated: \${outputFile.name}")
+                    }.onFailure { error ->
+                        logView.text = "Compiler invocation failed.\n\${error.message ?: error.javaClass.simpleName}"
+                        statusView.text = "Compiler invocation failed."
+                        toast("Compile failed.")
+                    }
+                }
+            }.start()
+        } catch (error: Exception) {
+            logView.text = "Could not start compiler.\n\${error.message ?: error.javaClass.simpleName}"
+            statusView.text = "Compiler setup failed."
+            toast("Compile setup failed.")
+        }
+    }
+
+    private fun ensureCompilerIncludes(): File {
+        val root = File(filesDir, "pawn-compiler")
+        val includeDirectory = File(root, "include")
+        if (includeDirectory.isDirectory && includeDirectory.list()?.isNotEmpty() == true) {
+            return includeDirectory
+        }
+
+        fun copyAssetPath(assetPath: String, destination: File) {
+            val children = assets.list(assetPath).orEmpty()
+            if (children.isEmpty()) {
+                destination.parentFile?.mkdirs()
+                assets.open(assetPath).use { input ->
+                    destination.outputStream().use { output -> input.copyTo(output) }
+                }
+                return
+            }
+
+            if (!destination.exists() && !destination.mkdirs()) {
+                throw IllegalStateException("Could not create compiler include folder.")
+            }
+            children.forEach { child ->
+                val childAsset = "$assetPath/$child"
+                val childTarget = File(destination, child)
+                val nested = assets.list(childAsset).orEmpty()
+                if (nested.isNotEmpty()) {
+                    copyAssetPath(childAsset, childTarget)
+                } else {
+                    childTarget.parentFile?.mkdirs()
+                    assets.open(childAsset).use { input ->
+                        childTarget.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }
+            }
+        }
+
+        copyAssetPath("pawn-compiler/include", includeDirectory)
+        if (!includeDirectory.isDirectory || includeDirectory.list()?.isEmpty() != false) {
+            throw IllegalStateException("Bundled Pawn include files are missing from the APK.")
+        }
+        return includeDirectory
     }
 
     private fun showProjects() {
         AlertDialog.Builder(this)
             .setTitle("Projects — ${workspaceLabel()}")
-            .setItems(arrayOf("Choose project folder", "Prepare workspace for compiler", "Open .pwn / .inc file", "Configure include directories")) { _, which ->
+            .setItems(arrayOf(
+                "Choose project folder",
+                "Prepare workspace for compiler",
+                "Browse project .pwn files",
+                "Open file from device",
+                "Configure include directories"
+            )) { _, which ->
                 when (which) {
                     0 -> chooseWorkspaceFolder()
                     1 -> stageWorkspace()
-                    2 -> openDocument()
-                    3 -> showIncludePathsDialog()
+                    2 -> showProjectSourcePicker(compileAfterSelection = false)
+                    3 -> openDocument()
+                    4 -> showIncludePathsDialog()
                 }
             }
             .setNegativeButton("Close", null)
@@ -549,6 +745,7 @@ public OnPlayerConnect(playerid)
             runOnUiThread {
                 result.onSuccess { stagedRoot ->
                     stagedWorkspace = stagedRoot
+                    currentSourceFile = null
                     val directories = PawnIncludePaths.existingDirectories(
                         workspaceRoot = stagedRoot,
                         customRelativePaths = customIncludePaths.lines()
@@ -738,10 +935,10 @@ public OnPlayerConnect(playerid)
     private fun initialCompilerLog(): String =
         "PawnForge Compiler Panel\n\n" +
             "Ready. Open a .pwn file and select Build > Compile.\n\n" +
-            "Pawn compiler engine: not bundled yet\n" +
+            "Native Pawn compiler: bundled\n" +
             "Target: SA-MP / open.mp\n" +
             "Output format: .amx\n\n" +
-            "Compilation will be enabled after the Android Pawn compiler is integrated."
+            "Select a staged workspace and source file to compile offline."
 
     private fun beveledBackground(fillColor: Int): GradientDrawable {
         return GradientDrawable().apply {
