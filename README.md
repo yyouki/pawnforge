@@ -19,7 +19,7 @@ Android launcher and title bar use the matching vector logo from `app/src/main/r
 - Native ABI builds: `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
 - Android minimum API: 24.
 
-The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/BagasZkyn/pawn-compiler-android) at pinned revision `c8bebc178045476746b2e1b0aa7108d4c7ed074b`. Its upstream license is preserved in the submodule and app assets.
+The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/BagasZkyn/pawn-compiler-android) at pinned revision `c8bebc178045476746b2e1b0aa7108d4c7ed074b`. Its upstream license is preserved in the submodule and packaged under `assets/pawn-compiler/LICENSE.txt`; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Current milestone: Android IDE shell
 
@@ -58,7 +58,7 @@ APK output:
 
     app/build/outputs/apk/debug/app-debug.apk
 
-Every push to main triggers native builds, unit tests, and APK packaging. Download the artifact named `pawnforge-debug-apk` from the successful workflow run.
+Every push to main builds the native libraries, runs JVM tests, packages the APK, and starts an Android emulator smoke test that compiles a minimal Pawn source file. Download the artifact named `pawnforge-debug-apk` from the successful workflow run.
 
 ## Project structure
 
