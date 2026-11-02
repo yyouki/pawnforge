@@ -1,0 +1,4 @@
+[submodule "third_party/pawn-compiler-android"]
+	path = third_party/pawn-compiler-android
+	url = https://github.com/BagasZkyn/pawn-compiler-android.git
+	branch = master
