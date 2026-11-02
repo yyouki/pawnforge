@@ -78,7 +78,15 @@ class WorkspaceStager(
     }
 
     private fun safeName(value: String): String {
-        val name = value.replace(Regex("[\\\\/\\\\\\u0000-\\\\u001F]"), "_").trim()
+        val name = buildString {
+            value.forEach { character ->
+                if (character == '/' || character == '\\\\' || character < ' ' || character == '\\u007f') {
+                    append('_')
+                } else {
+                    append(character)
+                }
+            }
+        }.trim()
         return name.takeIf { it.isNotEmpty() && it != "." && it != ".." } ?: "unnamed"
     }
 }
