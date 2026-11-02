@@ -6,7 +6,7 @@ PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode develop
 
 ![PawnForge logo](branding/pawnforge-logo.svg)
 
-The logo artwork intentionally contains only the pawn symbol and PawnForge wordmark.
+The refreshed identity uses a geometric gold pawn, cyan code brackets, a deep-navy tile, and the PawnForge wordmark. No tagline is embedded in the artwork.
 
 Android launcher and title bar use the matching vector logo from `app/src/main/res/drawable/ic_pawnforge_logo.xml`.
 
@@ -17,9 +17,16 @@ Android launcher and title bar use the matching vector logo from `app/src/main/r
 - Compiles `.pwn` files in-process and captures compiler diagnostics.
 - Builds `.amx` output for the selected project, then exports the edited source and generated AMX back through Android's Storage Access Framework.
 - Native ABI builds: `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
-- Android minimum API: 24.
+- Android minimum API: 24 (Android 7.0 Nougat); target and compile SDK: 36 (Android 16).
 
 The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/BagasZkyn/pawn-compiler-android) at pinned revision `c8bebc178045476746b2e1b0aa7108d4c7ed074b`. Its upstream license is preserved in the submodule and packaged under `assets/pawn-compiler/LICENSE.txt`; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Android compatibility and display
+
+- Supports Android 7.0 (API 24) and newer; native libraries are packaged for `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
+- Targets Android 16 (API 36) for current platform behavior and Google Play submission requirements.
+- Keeps the system status bar visible so the clock, Wi-Fi/mobile signal, and battery indicators remain available.
+- Applies Android 15/16 edge-to-edge insets so the editor starts below the status bar and remains clear of the navigation area and display cutouts.
 
 ## Current milestone: Android IDE shell
 
@@ -39,6 +46,10 @@ Not implemented yet:
 
 The app reports success only when the native compiler exits successfully and the `.amx` file exists. Compiler warnings and errors are displayed from the compiler output log.
 
+## Release readiness
+
+CI builds a debug APK and a release AAB, then runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. The AAB is signed only when the upload-key secrets documented in [the public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md) are configured. Physical-device testing, a hosted privacy-policy URL, store listing assets, and Play Console submission still require the publisher.
+
 ## Include handling
 
 PawnForge adds the workspace root, source directory, bundled compiler includes, and common `pawno/include`, `qawno/include`, `include`, `includes`, and `gamemode` directories to the compiler search list using repeated `-i` arguments. See [docs/INCLUDE_PATHS.md](docs/INCLUDE_PATHS.md) for quoted and angle-bracket include examples.
@@ -47,8 +58,8 @@ PawnForge adds the workspace root, source directory, bundled compiler includes, 
 
 Requirements:
 - JDK 17
-- Android SDK Platform 35
-- Gradle 8.9
+- Android SDK Platform 36
+- Gradle 8.11.1
 
 Run the following command:
 
