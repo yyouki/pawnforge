@@ -19,6 +19,7 @@ import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import android.widget.EditText
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -35,12 +36,16 @@ class MainActivity : Activity() {
     private lateinit var outputTab: TextView
 
     private var currentUri: Uri? = null
+    private var workspaceTreeUri: Uri? = null
+    private var customIncludePaths = ""
     private var activeFileName = "gamemode.pwn"
     private var showingCompiler = true
 
     companion object {
         private const val REQUEST_OPEN_FILE = 1101
         private const val REQUEST_SAVE_FILE = 1102
+        private const val REQUEST_OPEN_WORKSPACE = 1103
+        private const val PREFS_NAME = "pawnforge_settings"
 
         private const val PAWN_SAMPLE = """#include <a_samp>
 
@@ -67,6 +72,11 @@ public OnPlayerConnect(playerid)
         window.statusBarColor = Color.BLACK
         window.navigationBarColor = Color.rgb(32, 45, 67)
         window.decorView.systemUiVisibility = 0
+
+        // Restore the user-selected workspace and custom include directories.
+        val preferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        workspaceTreeUri = preferences.getString("workspace_tree_uri", null)?.let(Uri::parse)
+        customIncludePaths = preferences.getString("custom_include_paths", "") ?: ""
 
         buildInterface()
     }
@@ -179,12 +189,12 @@ public OnPlayerConnect(playerid)
             setBackgroundColor(Color.rgb(10, 76, 174))
         }
 
-        val pawn = TextView(this).apply {
-            text = "♟"
-            textSize = 26f
-            setTextColor(Color.WHITE)
+        // Use the same vector mark as the Android launcher icon.
+        val logo = ImageView(this).apply {
+            setImageResource(R.drawable.ic_pawnforge_logo)
+            scaleType = ImageView.ScaleType.FIT_CENTER
         }
-        bar.addView(pawn, LinearLayout.LayoutParams(dp(34), ViewGroup.LayoutParams.WRAP_CONTENT))
+        bar.addView(logo, LinearLayout.LayoutParams(dp(34), dp(34)))
 
         titleView = TextView(this).apply {
             text = "PawnForge — [$activeFileName]"
@@ -419,6 +429,24 @@ public OnPlayerConnect(playerid)
                 currentUri = uri
                 writeToUri(uri)
             }
+            REQUEST_OPEN_WORKSPACE -> {
+                try {
+                    // Keep access to the selected project folder after the app restarts.
+                    val grantedFlags = data?.flags?.and(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    ) ?: (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                    contentResolver.takePersistableUriPermission(uri, grantedFlags)
+                    workspaceTreeUri = uri
+                    getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                        .edit()
+                        .putString("workspace_tree_uri", uri.toString())
+                        .apply()
+                    statusView.text = "Workspace selected: ${workspaceLabel()}"
+                    toast("Project folder selected.")
+                } catch (error: Exception) {
+                    toast("Workspace access failed: ${error.message ?: "unknown error"}")
+                }
+            }
         }
     }
 
@@ -446,49 +474,144 @@ public OnPlayerConnect(playerid)
             appendLine("PawnForge — Build")
             appendLine()
             appendLine("Input:  $activeFileName")
+            appendLine("Workspace: ${workspaceLabel()}")
             appendLine("Target: SA-MP / open.mp")
             appendLine("Output: .amx")
             appendLine()
-            appendLine("Compiler engine is not integrated yet.")
-            appendLine("No .amx file was generated.")
+            appendLine("Configured include search directories:")
+            val paths = configuredIncludePaths()
+            paths.forEach { appendLine("  -i<workspace-root>/$it") }
             appendLine()
-            appendLine("Next milestone: build Pawn Compiler for Android")
-            appendLine("ABIs planned: arm64-v8a, armeabi-v7a, x86_64, x86")
+            appendLine("Quoted include example:")
+            appendLine("  #include \"gamemode/player.inc\"")
+            appendLine("  Resolved relative to the file containing the directive.")
+            appendLine()
+            appendLine("Angle-bracket include example:")
+            appendLine("  #include <gamemode/player.inc>")
+            appendLine("  Found through the project-root -i search path.")
+            appendLine()
+            appendLine("Compiler engine is not integrated yet.")
+            appendLine("No .amx file was generated; no compile diagnostics are available yet.")
+            appendLine()
+            appendLine("Planned Android ABIs: arm64-v8a, armeabi-v7a, x86_64, x86")
         }
         statusView.text = "Build not started — compiler engine missing."
     }
 
     private fun showProjects() {
         AlertDialog.Builder(this)
-            .setTitle("Projects — Workspace")
-            .setMessage(
-                "MyGamemode/\n" +
-                    "  pawno/\n" +
-                    "    $activeFileName  ← open file\n" +
-                    "  include/\n" +
-                    "    a_samp.inc\n" +
-                    "  scriptfiles/\n" +
-                    "  output/\n" +
-                    "    gamemode.amx\n\n" +
-                    "Use Open to select a .pwn or .inc file from device storage."
-            )
-            .setPositiveButton("Open file") { _, _ -> openDocument() }
+            .setTitle("Projects — ${workspaceLabel()}")
+            .setItems(arrayOf("Choose project folder", "Open .pwn / .inc file", "Configure include directories")) { _, which ->
+                when (which) {
+                    0 -> chooseWorkspaceFolder()
+                    1 -> openDocument()
+                    2 -> showIncludePathsDialog()
+                }
+            }
             .setNegativeButton("Close", null)
             .show()
     }
 
     private fun showSettings() {
         AlertDialog.Builder(this)
-            .setTitle("Options — Compiler")
-            .setMessage(
-                "Compiler: Pawn Compiler (not bundled)\n" +
-                    "Profiles: SA-MP Legacy / open.mp\n" +
-                    "Include paths: configurable in a later milestone\n" +
-                    "Output: .amx\n\n" +
-                    "The compiler engine will be added separately from this Android UI."
-            )
-            .setPositiveButton("OK", null)
+            .setTitle("Options")
+            .setItems(arrayOf("Project workspace", "Include directories", "Compiler profile")) { _, which ->
+                when (which) {
+                    0 -> chooseWorkspaceFolder()
+                    1 -> showIncludePathsDialog()
+                    2 -> showCompilerProfile()
+                }
+            }
+            .setNegativeButton("Close", null)
             .show()
+    }
+
+    private fun chooseWorkspaceFolder() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PREFIX_URI_PERMISSION
+            )
+        }
+        startActivityForResult(intent, REQUEST_OPEN_WORKSPACE)
+    }
+
+    private fun showIncludePathsDialog() {
+        val input = EditText(this).apply {
+            setText(customIncludePaths)
+            hint = "One relative folder per line"
+            minLines = 5
+            maxLines = 10
+            gravity = Gravity.TOP or Gravity.START
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+
+        val help = TextView(this).apply {
+            text = "Built-in paths: pawno/include, qawno/include, include, includes, gamemode, and project root (.).\nAdd custom folders relative to the project root, one per line."
+            textSize = 13f
+            setTextColor(Color.DKGRAY)
+            setPadding(dp(12), dp(4), dp(12), dp(8))
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(help)
+            addView(input, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(150)
+            ))
+            setPadding(dp(16), dp(4), dp(16), 0)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pawn include directories")
+            .setView(container)
+            .setPositiveButton("Save") { _, _ ->
+                customIncludePaths = input.text.toString()
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString("custom_include_paths", customIncludePaths)
+                    .apply()
+                statusView.text = "Include path settings saved."
+                toast("Include directories saved.")
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun showCompilerProfile() {
+        AlertDialog.Builder(this)
+            .setTitle("Compiler profile")
+            .setItems(arrayOf("SA-MP Legacy", "open.mp")) { _, which ->
+                val profile = if (which == 0) "SA-MP Legacy" else "open.mp"
+                getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                    .edit()
+                    .putString("compiler_profile", profile)
+                    .apply()
+                statusView.text = "Compiler profile: $profile"
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun configuredIncludePaths(): List<String> {
+        val custom = PawnIncludePaths.sanitizeRelativePaths(
+            customIncludePaths.lines()
+        )
+        return (PawnIncludePaths.defaultRelativeDirectories + custom).distinct()
+    }
+
+    private fun workspaceLabel(): String {
+        val uri = workspaceTreeUri ?: return "not selected"
+        return uri.lastPathSegment
+            ?.substringAfterLast(':')
+            ?.takeIf { it.isNotBlank() }
+            ?: "selected folder"
     }
 
     private fun showSearchDialog() {
