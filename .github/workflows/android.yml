@@ -55,5 +55,6 @@ jobs:
         with:
           api-level: 35
           arch: x86_64
-          target: google_apis
+          target: aosp_atd
+          emulator-boot-timeout: 300
           script: gradle --no-daemon :app:connectedDebugAndroidTest
