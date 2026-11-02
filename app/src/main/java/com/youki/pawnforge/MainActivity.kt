@@ -98,7 +98,7 @@ public OnPlayerConnect(playerid)
         }
 
         editor = EditText(this).apply {
-            text = PAWN_SAMPLE
+            setText(PAWN_SAMPLE)
             typeface = Typeface.MONOSPACE
             textSize = 14f
             setTextColor(Color.rgb(25, 25, 25))
@@ -153,7 +153,7 @@ public OnPlayerConnect(playerid)
             textSize = 13f
             setTextColor(Color.rgb(28, 28, 28))
             setPadding(dp(12), dp(10), dp(12), dp(12))
-            textIsSelectable = true
+            setTextIsSelectable(true)
         }
         logScroll.addView(logView)
         root.addView(logScroll, verticalParams(158))
