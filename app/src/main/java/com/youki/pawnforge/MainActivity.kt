@@ -564,7 +564,7 @@ public OnPlayerConnect(playerid)
             updateTitle()
             statusView.text = "Opened project source: $activeFileName"
         } catch (error: Exception) {
-            toast("Could not open source: \${error.message ?: "unknown error"}")
+            toast("Could not open source: ${error.message ?: "unknown error"}")
         }
     }
 
@@ -592,9 +592,9 @@ public OnPlayerConnect(playerid)
 
             logView.text = buildString {
                 appendLine("Pawn Community Compiler 3.10.10")
-                appendLine("Source: \${sourceFile.relativeTo(root).path}")
+                appendLine("Source: ${sourceFile.relativeTo(root).path}")
                 appendLine("Target: SA-MP / open.mp")
-                appendLine("Output: \${outputFile.relativeTo(root).path}")
+                appendLine("Output: ${outputFile.relativeTo(root).path}")
                 appendLine()
                 appendLine("Compiler arguments:")
                 arguments.drop(1).forEach { appendLine("  $it") }
@@ -624,24 +624,24 @@ public OnPlayerConnect(playerid)
                             appendLine()
                             if (success) {
                                 appendLine("BUILD SUCCEEDED")
-                                appendLine("AMX: \${compileResult.outputFile.absolutePath}")
+                                appendLine("AMX: ${compileResult.outputFile.absolutePath}")
                             } else {
                                 appendLine("BUILD FAILED")
-                                appendLine("Compiler exit code: \${compileResult.exitCode}")
+                                appendLine("Compiler exit code: ${compileResult.exitCode}")
                                 if (!compileResult.outputFile.exists()) appendLine("No AMX output file was produced.")
                             }
                         }
-                        statusView.text = if (success) "Compile successful: \${outputFile.name}" else "Compile failed — inspect diagnostics."
-                        if (success) toast("AMX generated: \${outputFile.name}")
+                        statusView.text = if (success) "Compile successful: ${outputFile.name}" else "Compile failed — inspect diagnostics."
+                        if (success) toast("AMX generated: ${outputFile.name}")
                     }.onFailure { error ->
-                        logView.text = "Compiler invocation failed.\n\${error.message ?: error.javaClass.simpleName}"
+                        logView.text = "Compiler invocation failed.\n${error.message ?: error.javaClass.simpleName}"
                         statusView.text = "Compiler invocation failed."
                         toast("Compile failed.")
                     }
                 }
             }.start()
         } catch (error: Exception) {
-            logView.text = "Could not start compiler.\n\${error.message ?: error.javaClass.simpleName}"
+            logView.text = "Could not start compiler.\n${error.message ?: error.javaClass.simpleName}"
             statusView.text = "Compiler setup failed."
             toast("Compile setup failed.")
         }
