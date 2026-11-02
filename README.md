@@ -2,6 +2,12 @@
 
 PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode development. Its interface intentionally follows the classic Pawno/Qawno desktop layout.
 
+## Brand identity
+
+![PawnForge logo](branding/pawnforge-logo.svg)
+
+Android launcher and title bar use the matching vector logo from `app/src/main/res/drawable/ic_pawnforge_logo.xml`.
+
 ## Current milestone: Android IDE shell
 
 Implemented:
@@ -10,12 +16,14 @@ Implemented:
 - Open and save source files through Android's Storage Access Framework.
 - Compiler and Output tabs with honest engine status.
 - Project, Settings, and About navigation panels.
+- Persistent workspace-folder selection and configurable include directories.
+- Pawn `-i` include-path builder with default `pawno/include`, `qawno/include`, `include`, `includes`, `gamemode`, and workspace-root search folders.
 - GitHub Actions workflow that builds and uploads a debug APK.
 
 Not implemented yet:
 - The Pawn compiler executable/library for Android.
 - Real compilation and .amx output.
-- Include-directory management and project workspace persistence.
+- Staging the selected SAF workspace into app-private storage for native compilation.
 - Full multi-file project explorer and editor undo/redo.
 
 The Compile action intentionally reports that the compiler engine is missing. It does not fabricate a successful build or create a fake .amx file.
@@ -45,3 +53,5 @@ Every push to main triggers the Android APK workflow. Download the artifact name
         res/values/
         AndroidManifest.xml
     .github/workflows/android.yml
+
+See [Pawn include handling](docs/INCLUDE_PATHS.md) for examples using `#include "gamemode/player.inc"` and `#include <gamemode/player.inc>`.
