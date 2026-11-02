@@ -393,8 +393,34 @@ public OnPlayerConnect(playerid)
         if (stagedFile != null) {
             try {
                 stagedFile.writeText(editor.text.toString(), Charsets.UTF_8)
-                statusView.text = "Saved: $activeFileName"
-                toast("Project file saved.")
+                val root = stagedWorkspace
+                val selectedFolder = workspaceTreeUri
+                if (root == null || selectedFolder == null) {
+                    statusView.text = "Saved in staged workspace only."
+                    toast("Saved locally; reconnect the project folder to sync it.")
+                    return
+                }
+
+                statusView.text = "Saving to project folder..."
+                // Save the editor buffer locally, then mirror that file to the SAF folder.
+                Thread {
+                    val export = runCatching {
+                        WorkspaceExporter(contentResolver).exportFiles(
+                            treeUri = selectedFolder,
+                            workspaceRoot = root,
+                            files = listOf(stagedFile)
+                        )
+                    }
+                    runOnUiThread {
+                        export.onSuccess {
+                            statusView.text = "Saved: $activeFileName"
+                            toast("Project file saved.")
+                        }.onFailure { error ->
+                            statusView.text = "Saved locally; project sync failed."
+                            toast("Local save OK; sync failed: ${error.message ?: "unknown error"}")
+                        }
+                    }
+                }.start()
             } catch (error: Exception) {
                 toast("Save failed: ${error.message ?: "unknown error"}")
             }
@@ -922,11 +948,11 @@ public OnPlayerConnect(playerid)
 
     private fun showAbout() {
         AlertDialog.Builder(this)
-            .setTitle("PawnForge 0.1.0")
+            .setTitle("PawnForge 0.3.0")
             .setMessage(
-                "PawnForge is an Android Pawn editor inspired by Pawno/Qawno.\n\n" +
-                    "This first build contains the editor interface and file handling. " +
-                    "Compilation will become available after the Android Pawn compiler engine is integrated."
+                "PawnForge is an Android Pawn editor and native compiler inspired by Pawno/Qawno.\n\n" +
+                    "Pawn Community Compiler 3.10.10 is bundled for arm64-v8a, armeabi-v7a, and x86_64. " +
+                    "Compile output and compiler diagnostics are shown in the Compiler panel."
             )
             .setPositiveButton("OK", null)
             .show()
