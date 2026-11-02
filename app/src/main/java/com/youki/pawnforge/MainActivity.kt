@@ -570,7 +570,7 @@ public OnPlayerConnect(playerid)
                     statusView.text = "Workspace prepared: ${stagedRoot.name}"
                     toast("Workspace prepared.")
                 }.onFailure { error ->
-                    logView.text = "Workspace preparation failed:\\n${error.message ?: "unknown error"}"
+                    logView.text = "Workspace preparation failed. Check folder access and try again."
                     statusView.text = "Workspace preparation failed."
                     toast("Could not prepare workspace.")
                 }
