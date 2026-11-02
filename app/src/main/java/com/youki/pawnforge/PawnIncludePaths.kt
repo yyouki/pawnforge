@@ -17,7 +17,13 @@ object PawnIncludePaths {
     )
 
     fun sanitizeRelativePaths(paths: List<String>): List<String> = paths
-        .map { it.trim().replace('\\\\', '/') }
+        .map { value ->
+            buildString {
+                value.trim().forEach { character ->
+                    append(if (character.code == 92) '/' else character)
+                }
+            }
+        }
         .filter { path ->
             path.isNotBlank() &&
                 !path.startsWith("/") &&
