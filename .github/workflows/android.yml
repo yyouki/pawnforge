@@ -1,4 +1,4 @@
-name: Android APK
+name: Android build and compatibility
 
 on:
   push:
@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build PawnForge APK
+    name: Build PawnForge APK and AAB
     runs-on: ubuntu-latest
 
     steps:
@@ -30,31 +30,69 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018 cmake;3.22.1
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
+
+      - name: Configure optional Play upload signing
+        shell: bash
+        env:
+          PAWNFORGE_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PAWNFORGE_UPLOAD_KEYSTORE_BASE64 }}
+          PAWNFORGE_RELEASE_STORE_PASSWORD: ${{ secrets.PAWNFORGE_RELEASE_STORE_PASSWORD }}
+          PAWNFORGE_RELEASE_KEY_ALIAS: ${{ secrets.PAWNFORGE_RELEASE_KEY_ALIAS }}
+          PAWNFORGE_RELEASE_KEY_PASSWORD: ${{ secrets.PAWNFORGE_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" &&
+                -n "$PAWNFORGE_RELEASE_STORE_PASSWORD" &&
+                -n "$PAWNFORGE_RELEASE_KEY_ALIAS" &&
+                -n "$PAWNFORGE_RELEASE_KEY_PASSWORD" ]]; then
+            printf '%s' "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pawnforge-upload-key.jks"
+            echo "PAWNFORGE_RELEASE_STORE_FILE=$RUNNER_TEMP/pawnforge-upload-key.jks" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_STORE_PASSWORD=$PAWNFORGE_RELEASE_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_KEY_ALIAS=$PAWNFORGE_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_KEY_PASSWORD=$PAWNFORGE_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "::notice::Release AAB signing is configured."
+          else
+            echo "::warning::Upload signing secrets are missing; the release AAB artifact will be unsigned."
+          fi
 
       - name: Verify compiler submodule
         run: test -f third_party/pawn-compiler-android/source/compiler/CMakeLists.txt
 
-      - name: Run unit tests and build APK
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Run unit tests and build APK/AAB
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
 
-      - name: Upload APK
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: pawnforge-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Run native compiler smoke test
+      - name: Upload release Android App Bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnforge-release-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      - name: Test Android 7.0 (API 24) compatibility
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 24
           arch: x86_64
-          target: aosp_atd
+          target: default
+          emulator-boot-timeout: 300
+          script: gradle --no-daemon :app:connectedDebugAndroidTest
+
+      - name: Test Android 16 (API 36) compatibility
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
           emulator-boot-timeout: 300
           script: gradle --no-daemon :app:connectedDebugAndroidTest
