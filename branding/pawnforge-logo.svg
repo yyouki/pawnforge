@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
+  <title id="title">PawnForge logo</title>
+  <desc id="desc">A golden chess pawn inside a blue rounded square, framed by code brackets, beside the PawnForge wordmark.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#123C75"/><stop offset="1" stop-color="#071A31"/></linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0.9" y2="1"><stop offset="0" stop-color="#FFE29A"/><stop offset="1" stop-color="#E6A72E"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#75B5FF"/><stop offset="1" stop-color="#2474D8"/></linearGradient>
+  </defs>
+  <g transform="translate(20 20)">
+    <rect width="280" height="280" rx="58" fill="url(#bg)"/>
+    <path d="M46 108 20 140l26 32" fill="none" stroke="url(#blue)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="m234 108 26 32-26 32" fill="none" stroke="url(#blue)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="140" cy="78" r="27" fill="url(#gold)"/>
+    <path d="M110 117c6-13 17-20 30-20s24 7 30 20l-8 42 26 38 7 20H83l7-20 26-38z" fill="url(#gold)"/>
+    <path d="M91 218h98l17 16v11H74v-11z" fill="#D99422"/>
+    <path d="M104 202h72" stroke="#FFF0C7" stroke-width="5" stroke-linecap="round" opacity=".65"/>
+    <path d="M93 238h94" stroke="#FFF0C7" stroke-width="4" stroke-linecap="round" opacity=".45"/>
+  </g>
+  <g transform="translate(350 0)">
+    <text x="0" y="155" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="104" font-weight="750" letter-spacing="-5" fill="#102B4D">Pawn<tspan fill="#1D66C2">Forge</tspan></text>
+    <text x="7" y="214" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="27" font-weight="600" letter-spacing="7" fill="#5F7289">PAWN IDE  •  SA-MP  •  OPEN.MP</text>
+  </g>
+</svg>
