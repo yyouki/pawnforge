@@ -19,7 +19,7 @@ This is a normal Android APK installation. Google Play is not required.
 
 Android checks that an app update is signed by the same signing certificate as the installed version.
 
-- If the repository has no permanent signing key configured, CI uses its temporary debug key. The APK is installable, but a later CI run may use a different debug key. In that case Android will reject an in-place update; uninstall the old build before installing the new one. Copy important source files to the selected project folder first.
+- Pull-request builds use a temporary debug key for test artifacts only. Trusted main-branch builds now require the permanent publisher keystore and fail closed if it is missing.
 - For consistent updates, create one permanent keystore and keep a secure offline backup. Never commit the keystore or its passwords to the repository.
 - Add the following repository Actions secrets under **Settings → Secrets and variables → Actions**:
   - `PAWNFORGE_UPLOAD_KEYSTORE_BASE64`: base64 text of the keystore file.
@@ -29,7 +29,13 @@ Android checks that an app update is signed by the same signing certificate as t
 
 Once configured, main-branch release APKs use that permanent certificate. Do not lose the keystore: only a build signed by the same key can update the installed app without uninstalling it.
 
-### Create a permanent keystore
+### Permanent PawnForge key and migration
+
+A permanent signing kit has been generated for this project. Follow [APK_SIGNING_MIGRATION.md](APK_SIGNING_MIGRATION.md) to add the four Actions secrets and migrate from the old debug-signed 0.4.0 APK. The private JKS and secret payload are distributed separately and are never committed to this repository.
+
+The 0.4.0 APK was signed by an ephemeral GitHub runner debug key whose private key was not retained. If it is already installed, one uninstall/reinstall is unavoidable when switching to the permanent 0.5.0 signing certificate. Once 0.5.0 is installed, keep using the same private JKS to update in place forever.
+
+### Generate a replacement key only if the original is lost before publication
 
 Run this once on a trusted computer with the JDK installed (Android Studio includes a JDK). Replace the sample alias with a name you choose and enter your own strong passwords when prompted:
 
