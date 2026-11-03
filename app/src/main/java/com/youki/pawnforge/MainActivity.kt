@@ -444,6 +444,10 @@ public OnPlayerConnect(playerid)
                 KeyEvent.KEYCODE_C -> { copySelection(); return true }
                 KeyEvent.KEYCODE_V -> { pasteClipboard(); return true }
                 KeyEvent.KEYCODE_A -> { editor.selectAll(); return true }
+                KeyEvent.KEYCODE_D -> { duplicateLineOrSelection(); return true }
+                KeyEvent.KEYCODE_L -> { deleteCurrentLines(); return true }
+                KeyEvent.KEYCODE_K -> { toggleComments(); return true }
+                KeyEvent.KEYCODE_G -> { showGoToLineDialog(); return true }
             }
         }
         return super.dispatchKeyEvent(event)
@@ -1195,7 +1199,21 @@ public OnPlayerConnect(playerid)
     }
 
     private fun showEditMenu() {
-        val actions = arrayOf("Undo", "Redo", "Cut", "Copy", "Paste", "Select all", "Indent selection", "Unindent selection", "Insert Pawn callback")
+        val actions = arrayOf(
+            "Undo",
+            "Redo",
+            "Cut",
+            "Copy",
+            "Paste",
+            "Select all",
+            "Duplicate line / selection",
+            "Delete line(s)",
+            "Toggle line / block comment",
+            "Indent selection",
+            "Unindent selection",
+            "Go to line",
+            "Insert Pawn callback"
+        )
         AlertDialog.Builder(this)
             .setTitle("Edit")
             .setItems(actions) { _, which ->
@@ -1206,12 +1224,78 @@ public OnPlayerConnect(playerid)
                     3 -> copySelection()
                     4 -> pasteClipboard()
                     5 -> editor.selectAll()
-                    6 -> transformSelectedLines(indent = true)
-                    7 -> transformSelectedLines(indent = false)
-                    8 -> showSnippetMenu()
+                    6 -> duplicateLineOrSelection()
+                    7 -> deleteCurrentLines()
+                    8 -> toggleComments()
+                    9 -> transformSelectedLines(indent = true)
+                    10 -> transformSelectedLines(indent = false)
+                    11 -> showGoToLineDialog()
+                    12 -> showSnippetMenu()
                 }
             }
             .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun applyTextEdit(edit: PawnTextEdit) {
+        editor.setText(edit.text)
+        val start = edit.selectionStart.coerceIn(0, editor.text.length)
+        val end = edit.selectionEnd.coerceIn(0, editor.text.length)
+        editor.setSelection(minOf(start, end), maxOf(start, end))
+        editor.requestFocus()
+        updateLineNumbers(editor.text)
+        updateTitle()
+        updateCursorStatus()
+    }
+
+    private fun duplicateLineOrSelection() {
+        val edit = PawnEditorActions.duplicate(
+            editor.text.toString(),
+            editor.selectionStart.coerceAtLeast(0),
+            editor.selectionEnd.coerceAtLeast(0)
+        )
+        applyTextEdit(edit)
+    }
+
+    private fun deleteCurrentLines() {
+        val edit = PawnEditorActions.deleteLines(
+            editor.text.toString(),
+            editor.selectionStart.coerceAtLeast(0),
+            editor.selectionEnd.coerceAtLeast(0)
+        )
+        applyTextEdit(edit)
+    }
+
+    private fun toggleComments() {
+        val edit = PawnEditorActions.toggleComments(
+            editor.text.toString(),
+            editor.selectionStart.coerceAtLeast(0),
+            editor.selectionEnd.coerceAtLeast(0)
+        )
+        applyTextEdit(edit)
+    }
+
+    private fun showGoToLineDialog() {
+        val input = EditText(this).apply {
+            hint = "Line number"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setSingleLine(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Go to line")
+            .setView(input)
+            .setPositiveButton("Go") { _, _ ->
+                val requestedLine = input.text.toString().toIntOrNull()
+                if (requestedLine == null || requestedLine < 1) {
+                    toast("Enter a line number greater than zero.")
+                } else {
+                    val offset = PawnEditorActions.offsetForLine(editor.text.toString(), requestedLine)
+                    editor.requestFocus()
+                    editor.setSelection(offset)
+                    updateCursorStatus()
+                }
+            }
+            .setNegativeButton("Cancel", null)
             .show()
     }
 
