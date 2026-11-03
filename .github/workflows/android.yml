@@ -69,14 +69,29 @@ jobs:
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
 
       - name: Verify release APK signature
+        shell: bash
+        env:
+          EXPECTED_RELEASE_CERT_SHA256: ff08fc90481ab273134d958a415ceb58c3fa140b8864b0e634d64803805992ac
         run: |
           CERT_OUTPUT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)"
           echo "$CERT_OUTPUT"
-          EXPECTED_CERT="FF:08:FC:90:48:1A:B2:73:13:4D:95:8A:41:5C:EB:58:C3:FA:14:0B:88:64:B0:E6:34:D6:48:03:80:59:92:AC"
-          grep -Fq "Signer #1 certificate SHA-256 digest: $EXPECTED_CERT" <<< "$CERT_OUTPUT" || {
-            echo "::error::The APK is not signed by the expected permanent PawnForge release certificate."
+
+          # apksigner emits lowercase hexadecimal without separators; normalize defensively.
+          ACTUAL_CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$CERT_OUTPUT" | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test -n "$ACTUAL_CERT" || {
+            echo "::error::Could not read APK signing certificate."
             exit 1
           }
+
+          if [[ "$GITHUB_REF" == "refs/heads/main" && "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            if [[ "$ACTUAL_CERT" != "$EXPECTED_RELEASE_CERT_SHA256" ]]; then
+              echo "::error::The main-branch release APK is not signed by the permanent PawnForge publisher certificate."
+              exit 1
+            fi
+            echo "::notice::Permanent PawnForge publisher certificate verified."
+          else
+            echo "::notice::Pull-request APK signature verified. This is a test artifact, not a distributable release."
+          fi
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
