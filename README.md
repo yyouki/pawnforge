@@ -33,7 +33,7 @@ The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/
 Implemented:
 - Classic blue title bar, File/Edit/Search/Build/Options/Help menu, and toolbar.
 - Pawn source editor with monospaced text, live line numbers, basic syntax coloring, auto-indentation, and a modified-file indicator.
-- Bounded Undo/Redo history, clipboard Cut/Copy/Paste, indentation controls, and Ctrl-key shortcuts for external keyboards.
+- Bounded Undo/Redo history, clipboard Cut/Copy/Paste, line/selection duplicate and delete, `//` comment toggling, indentation controls, Go To Line, and Ctrl-key shortcuts for external keyboards.
 - Find Next/Previous with wraparound and built-in Pawn callback snippets.
 - Open and save source files through Android's Storage Access Framework.
 - Persistent Compiler and Output tabs; compile results remain visible when switching panels.
