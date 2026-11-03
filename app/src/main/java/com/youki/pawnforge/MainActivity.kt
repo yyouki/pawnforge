@@ -12,10 +12,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.text.Editable
+import android.text.InputFilter
 import android.text.Spanned
 import android.text.TextWatcher
 import android.text.style.ForegroundColorSpan
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -145,6 +147,20 @@ public OnPlayerConnect(playerid)
             isSingleLine = false
             setHorizontallyScrolling(true)
             setLineSpacing(0f, 1.12f)
+            // Continue the current indentation when the soft or hardware keyboard inserts Enter.
+            filters = arrayOf(InputFilter { source, start, end, dest, dstart, dend ->
+                val inserted = source.subSequence(start, end).toString()
+                if (inserted != "\\n" || dstart != dend) {
+                    null
+                } else {
+                    val lineStart = dest.toString().lastIndexOf('\\n', (dstart - 1).coerceAtLeast(0))
+                        .let { if (it < 0) 0 else it + 1 }
+                    val currentLine = dest.subSequence(lineStart, dstart).toString()
+                    val indentation = currentLine.takeWhile { it == ' ' || it == '\\t' }
+                    val extraIndent = if (currentLine.trimEnd().endsWith("{")) "    " else ""
+                    "\\n$indentation$extraIndent"
+                }
+            })
         }
 
         editorArea.addView(
@@ -410,6 +426,23 @@ public OnPlayerConnect(playerid)
             setOnClickListener { action() }
         }
         parent.addView(item, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && event.isCtrlPressed) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_Z -> { undoEditor(); return true }
+                KeyEvent.KEYCODE_Y -> { redoEditor(); return true }
+                KeyEvent.KEYCODE_S -> { saveDocument(); return true }
+                KeyEvent.KEYCODE_O -> { openDocument(); return true }
+                KeyEvent.KEYCODE_F -> { showSearchDialog(); return true }
+                KeyEvent.KEYCODE_X -> { cutSelection(); return true }
+                KeyEvent.KEYCODE_C -> { copySelection(); return true }
+                KeyEvent.KEYCODE_V -> { pasteClipboard(); return true }
+                KeyEvent.KEYCODE_A -> { editor.selectAll(); return true }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun onMenuSelected(label: String) {
@@ -1061,7 +1094,7 @@ public OnPlayerConnect(playerid)
 
     private fun showAbout() {
         AlertDialog.Builder(this)
-            .setTitle("PawnForge 0.4.0")
+            .setTitle("PawnForge ${BuildConfig.VERSION_NAME}")
             .setMessage(
                 "PawnForge is an Android Pawn editor and native compiler inspired by Pawno/Qawno.\n\n" +
                     "Pawn Community Compiler 3.10.10 is bundled for arm64-v8a, armeabi-v7a, and x86_64. " +
