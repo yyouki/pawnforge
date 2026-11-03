@@ -61,6 +61,7 @@ class SystemBarsCompatibilityTest {
 
             if (Build.VERSION.SDK_INT >= 35) {
                 // Exercise the inset listener even on headless emulator images with no visible status-bar inset.
+                val imeHeight = maxOf(220, navigationBarHeight + 160)
                 val simulatedSystemBars = WindowInsets.Builder()
                     .setInsets(
                         WindowInsets.Type.statusBars(),
@@ -70,16 +71,32 @@ class SystemBarsCompatibilityTest {
                         WindowInsets.Type.navigationBars(),
                         Insets.of(0, 0, 0, navigationBarHeight)
                     )
+                    .setInsets(
+                        WindowInsets.Type.ime(),
+                        Insets.of(0, 0, 0, imeHeight)
+                    )
+                    .setVisible(WindowInsets.Type.ime(), true)
                     .build()
 
-                root.dispatchApplyWindowInsets(simulatedSystemBars)
+                var topPadding = 0
+                var bottomPadding = 0
+                // Attached view padding must be changed and read on the Android UI thread.
+                instrumentation.runOnMainSync {
+                    root.dispatchApplyWindowInsets(simulatedSystemBars)
+                    topPadding = root.paddingTop
+                    bottomPadding = root.paddingBottom
+                }
                 assertTrue(
                     "Edge-to-edge layout must reserve the supplied status-bar inset.",
-                    root.paddingTop >= statusBarHeight
+                    topPadding >= statusBarHeight
                 )
                 assertTrue(
                     "Edge-to-edge layout must reserve the supplied navigation-bar inset.",
-                    root.paddingBottom >= navigationBarHeight
+                    bottomPadding >= navigationBarHeight
+                )
+                assertTrue(
+                    "Editor content must reserve the software-keyboard inset.",
+                    bottomPadding >= imeHeight
                 )
             } else {
                 val location = IntArray(2)
