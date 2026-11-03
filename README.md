@@ -52,7 +52,11 @@ The app reports success only when the native compiler exits successfully and the
 
 Version 0.5.0 builds a debug APK and an installable release APK signed with a permanent publisher key. CI verifies the exact signing-certificate fingerprint and runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. A successful push to `main` publishes the APK to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest), which provides free downloads for this public repository. No Play Store account or paid hosting is required for direct APK distribution.
 
-When no permanent publisher keystore is configured, CI signs the APK with its temporary debug key so it can be installed for testing. For in-place updates between releases, configure a permanent key using the steps in [APK distribution](docs/APK_DISTRIBUTION.md); without it, uninstalling the previous build may be required.
+Trusted main-branch releases require the permanent publisher key and verify its certificate fingerprint. Pull-request artifacts use a temporary debug key and are for testing only. See [the one-time 0.4.0 signing migration and permanent key setup](docs/APK_SIGNING_MIGRATION.md). After migrating to 0.5.0, future versions can update in place without uninstalling as long as the original JKS is kept.
+
+## Editor roadmap
+
+See [the Pawn IDE feature roadmap](docs/FEATURE_ROADMAP.md) for the Pawno/Qawno-inspired features already included and the recommended priorities for multi-file tabs, structured diagnostics, autocomplete, native reference, and mobile editing tools.
 
 ## Include handling
 
