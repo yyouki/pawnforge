@@ -6,7 +6,7 @@ PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode develop
 
 ![PawnForge logo](branding/pawnforge-logo.svg)
 
-The refreshed identity uses a hand-drawn pawn silhouette, warm parchment and terracotta accents, and a custom wordmark designed to stay readable on both light and dark pages. No tagline is embedded in the artwork.
+The refreshed identity uses a crafted pawn silhouette, terracotta code brackets, parchment highlights, and a deep-teal field. The Android launcher uses an adaptive icon on Android 8+ and a vector fallback for Android 7. The vector artwork is maintained in branding/pawnforge-logo.svg and branding/pawnforge-app-icon.svg.
 
 Android launcher and title bar use the matching vector logo from `app/src/main/res/drawable/ic_pawnforge_logo.xml`.
 
@@ -32,9 +32,11 @@ The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/
 
 Implemented:
 - Classic blue title bar, File/Edit/Search/Build/Options/Help menu, and toolbar.
-- Pawn source editor with monospaced text, line-number gutter, and basic syntax coloring.
+- Pawn source editor with monospaced text, live line numbers, basic syntax coloring, auto-indentation, and a modified-file indicator.
+- Bounded Undo/Redo history, clipboard Cut/Copy/Paste, indentation controls, and Ctrl-key shortcuts for external keyboards.
+- Find Next/Previous with wraparound and built-in Pawn callback snippets.
 - Open and save source files through Android's Storage Access Framework.
-- Compiler and Output tabs with native Pawn compiler diagnostics.
+- Persistent Compiler and Output tabs; compile results remain visible when switching panels.
 - Project, Settings, and About navigation panels.
 - Persistent workspace-folder selection and configurable include directories.
 - Pawn `-i` include-path builder with default `pawno/include`, `qawno/include`, `include`, `includes`, `gamemode`, and workspace-root search folders.
@@ -42,13 +44,13 @@ Implemented:
 
 Not implemented yet:
 - Full physical-device smoke testing and real-world SA-MP/open.mp project validation.
-- Full multi-file project explorer and editor undo/redo.
+- Multi-file tabs, complete project explorer, Replace All, structured compiler diagnostics with jump-to-line, completion, and a natives browser.
 
 The app reports success only when the native compiler exits successfully and the `.amx` file exists. Compiler warnings and errors are displayed from the compiler output log.
 
 ## Release readiness
 
-CI builds a debug APK and an installable release APK, verifies its signature, and runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. A successful push to `main` publishes the APK to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest), which provides free downloads for this public repository. No Play Store account or paid hosting is required for direct APK distribution.
+Version 0.5.0 builds a debug APK and an installable release APK signed with a permanent publisher key. CI verifies the exact signing-certificate fingerprint and runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. A successful push to `main` publishes the APK to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest), which provides free downloads for this public repository. No Play Store account or paid hosting is required for direct APK distribution.
 
 When no permanent publisher keystore is configured, CI signs the APK with its temporary debug key so it can be installed for testing. For in-place updates between releases, configure a permanent key using the steps in [APK distribution](docs/APK_DISTRIBUTION.md); without it, uninstalling the previous build may be required.
 
