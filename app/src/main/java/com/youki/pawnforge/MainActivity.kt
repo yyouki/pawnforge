@@ -3,6 +3,8 @@ package com.youki.pawnforge
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.content.ClipboardManager
+import android.content.ClipData
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -45,6 +47,13 @@ class MainActivity : Activity() {
     private var customIncludePaths = ""
     private var activeFileName = "gamemode.pwn"
     private var showingCompiler = true
+    private val editorHistory = EditorHistory()
+    private var pendingEditSnapshot: EditorSnapshot? = null
+    private var applyingHistory = false
+    private var savedDocumentText = PAWN_SAMPLE
+    private var compilerLogText = initialCompilerLog()
+    private var buildOutputText = "No build has been run yet."
+    private var lastSearchText = ""
 
     companion object {
         private const val REQUEST_OPEN_FILE = 1101
@@ -83,8 +92,8 @@ public OnPlayerConnect(playerid)
             window.isStatusBarContrastEnforced = false
             window.isNavigationBarContrastEnforced = false
         } else {
-            window.statusBarColor = Color.rgb(10, 76, 174)
-            window.navigationBarColor = Color.rgb(32, 45, 67)
+            window.statusBarColor = Color.rgb(23, 47, 56)
+            window.navigationBarColor = Color.rgb(23, 47, 56)
         }
 
         // Restore the user-selected workspace and custom include directories.
@@ -99,7 +108,7 @@ public OnPlayerConnect(playerid)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             // This color is visible behind transparent system bars on Android 15+.
-            setBackgroundColor(Color.rgb(10, 76, 174))
+            setBackgroundColor(Color.rgb(23, 47, 56))
         }
 
         root.addView(buildTitleBar(), verticalParams(48))
@@ -153,17 +162,36 @@ public OnPlayerConnect(playerid)
         ))
 
         editor.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                pendingEditSnapshot = if (!applyingHistory && s != null) {
+                    EditorSnapshot(s.toString(), editor.selectionStart.coerceAtLeast(0), editor.selectionEnd.coerceAtLeast(0))
+                } else null
+            }
 
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 updateLineNumbers(s)
             }
 
             override fun afterTextChanged(editable: Editable?) {
-                editable?.let { applySyntaxHighlighting(it) }
+                editable ?: return
+                if (!applyingHistory) {
+                    val previous = pendingEditSnapshot
+                    if (previous != null) {
+                        editorHistory.record(
+                            previous,
+                            EditorSnapshot(editable.toString(), editor.selectionStart.coerceAtLeast(0), editor.selectionEnd.coerceAtLeast(0))
+                        )
+                    }
+                }
+                updateTitle()
+                updateCursorStatus()
+                applySyntaxHighlighting(editable)
             }
         })
+        editor.setOnClickListener { updateCursorStatus() }
         updateLineNumbers(editor.text)
+        updateTitle()
+        updateCursorStatus()
         applySyntaxHighlighting(editor.text)
 
         root.addView(buildPanelTabs(), verticalParams(36))
@@ -173,7 +201,7 @@ public OnPlayerConnect(playerid)
             isFillViewport = true
         }
         logView = TextView(this).apply {
-            text = initialCompilerLog()
+            text = compilerLogText
             typeface = Typeface.MONOSPACE
             textSize = 13f
             setTextColor(Color.rgb(28, 28, 28))
@@ -224,7 +252,7 @@ public OnPlayerConnect(playerid)
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
             setPadding(dp(12), 0, dp(8), 0)
-            setBackgroundColor(Color.rgb(10, 76, 174))
+            setBackgroundColor(Color.rgb(23, 47, 56))
         }
 
         // Use the same vector mark as the Android launcher icon.
@@ -290,8 +318,8 @@ public OnPlayerConnect(playerid)
         addToolbarButton(toolbar, "▯", 42) { newFile() }
         addToolbarButton(toolbar, "📂", 42) { openDocument() }
         addToolbarButton(toolbar, "▣", 42) { saveDocument() }
-        addToolbarButton(toolbar, "↶", 42) { toast("Undo belum tersedia pada build awal.") }
-        addToolbarButton(toolbar, "↷", 42) { toast("Redo belum tersedia pada build awal.") }
+        addToolbarButton(toolbar, "↶", 42) { undoEditor() }
+        addToolbarButton(toolbar, "↷", 42) { redoEditor() }
         addToolbarButton(toolbar, "▶ Compile", 112) { runCompile() }
 
         scroll.addView(toolbar)
@@ -354,8 +382,7 @@ public OnPlayerConnect(playerid)
         outputTab.background = beveledBackground(
             if (showingCompiler) Color.rgb(239, 239, 239) else Color.rgb(194, 218, 248)
         )
-        logView.text = if (showingCompiler) initialCompilerLog()
-        else "PawnForge Output\n\nNo build output yet.\nOpen a .pwn file and use Build > Compile."
+        logView.text = if (showingCompiler) compilerLogText else buildOutputText
     }
 
     private fun buildBottomNavigation(): View {
@@ -389,15 +416,21 @@ public OnPlayerConnect(playerid)
         when (label) {
             "File" -> AlertDialog.Builder(this)
                 .setTitle("File")
-                .setItems(arrayOf("New", "Open", "Save", "Save As")) { _, which ->
+                .setItems(arrayOf("New", "Open", "Save", "Save As", "New gamemode template")) { _, which ->
                     when (which) {
                         0 -> newFile()
                         1 -> openDocument()
                         2 -> saveDocument()
                         3 -> saveDocumentAs()
+                        4 -> confirmBeforeReplacing {
+                            activeFileName = "gamemode.pwn"
+                            currentUri = null
+                            currentSourceFile = null
+                            replaceEditorContent(PAWN_SAMPLE)
+                        }
                     }
                 }.show()
-            "Edit" -> toast("Gunakan keyboard Android untuk mengedit kode.")
+            "Edit" -> showEditMenu()
             "Search" -> showSearchDialog()
             "Build" -> runCompile()
             "Options" -> showSettings()
@@ -406,21 +439,24 @@ public OnPlayerConnect(playerid)
     }
 
     private fun newFile() {
-        activeFileName = "gamemode.pwn"
-        currentUri = null
-        currentSourceFile = null
-        editor.setText(PAWN_SAMPLE)
-        updateTitle()
-        statusView.text = "New file created."
+        confirmBeforeReplacing {
+            activeFileName = "gamemode.pwn"
+            currentUri = null
+            currentSourceFile = null
+            replaceEditorContent(PAWN_SAMPLE)
+            statusView.text = "New Pawn gamemode created."
+        }
     }
 
     private fun openDocument() {
-        // SAF lets the user choose a source file without broad storage permissions.
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
+        confirmBeforeReplacing {
+            // SAF lets the user choose a source file without broad storage permissions.
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            startActivityForResult(intent, REQUEST_OPEN_FILE)
         }
-        startActivityForResult(intent, REQUEST_OPEN_FILE)
     }
 
     private fun saveDocument() {
@@ -428,6 +464,7 @@ public OnPlayerConnect(playerid)
         if (stagedFile != null) {
             try {
                 stagedFile.writeText(editor.text.toString(), Charsets.UTF_8)
+                markDocumentSaved()
                 val root = stagedWorkspace
                 val selectedFolder = workspaceTreeUri
                 if (root == null || selectedFolder == null) {
@@ -492,8 +529,7 @@ public OnPlayerConnect(playerid)
                     currentUri = uri
                     currentSourceFile = null
                     activeFileName = uri.lastPathSegment?.substringAfterLast('/') ?: "untitled.pwn"
-                    editor.setText(content)
-                    updateTitle()
+                    replaceEditorContent(content)
                     statusView.text = "Opened: $activeFileName"
                 } catch (error: Exception) {
                     toast("Open failed: ${error.message ?: "unknown error"}")
@@ -532,7 +568,7 @@ public OnPlayerConnect(playerid)
             } ?: throw IllegalStateException("File could not be written.")
 
             activeFileName = uri.lastPathSegment?.substringAfterLast('/') ?: activeFileName
-            updateTitle()
+            markDocumentSaved()
             statusView.text = "Saved: $activeFileName"
             toast("File saved.")
         } catch (error: Exception) {
@@ -589,8 +625,10 @@ public OnPlayerConnect(playerid)
             .setTitle("Select Pawn source")
             .setItems(labels) { _, which ->
                 val selected = sources[which]
-                openStagedSource(selected)
-                if (compileAfterSelection) compileStagedSource(root, selected)
+                confirmBeforeReplacing {
+                    openStagedSource(selected)
+                    if (compileAfterSelection) compileStagedSource(root, selected)
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -618,11 +656,10 @@ public OnPlayerConnect(playerid)
 
     private fun openStagedSource(sourceFile: File) {
         try {
-            editor.setText(sourceFile.readText(Charsets.UTF_8))
             currentSourceFile = sourceFile
             currentUri = null
             activeFileName = sourceFile.name
-            updateTitle()
+            replaceEditorContent(sourceFile.readText(Charsets.UTF_8))
             statusView.text = "Opened project source: $activeFileName"
         } catch (error: Exception) {
             toast("Could not open source: ${error.message ?: "unknown error"}")
@@ -651,7 +688,7 @@ public OnPlayerConnect(playerid)
             val logFile = File(cacheDir, "pawnforge-compiler.log")
             val temporaryDirectory = File(cacheDir, "pawn-tmp")
 
-            logView.text = buildString {
+            compilerLogText = buildString {
                 appendLine("Pawn Community Compiler 3.10.10")
                 appendLine("Source: ${sourceFile.relativeTo(root).path}")
                 appendLine("Target: SA-MP / open.mp")
@@ -662,6 +699,8 @@ public OnPlayerConnect(playerid)
                 appendLine()
                 appendLine("Compiling...")
             }
+            if (showingCompiler) logView.text = compilerLogText
+            buildOutputText = "Build running: $activeFileName"
             statusView.text = "Compiling $activeFileName..."
 
             // Run the native compiler off the UI thread; native output is captured to a log file.
@@ -697,7 +736,7 @@ public OnPlayerConnect(playerid)
                     result.onSuccess { compileResult ->
                         val success = compileResult.exitCode == 0 && compileResult.outputFile.isFile
                         val exported = exportResult.isSuccess
-                        logView.text = buildString {
+                        compilerLogText = buildString {
                             append(compileResult.output)
                             if (compileResult.output.isNotBlank() && !compileResult.output.endsWith("\n")) appendLine()
                             appendLine()
@@ -719,6 +758,14 @@ public OnPlayerConnect(playerid)
                                 else appendLine("Source export warning: ${exportResult.exceptionOrNull()?.message ?: "unknown error"}")
                             }
                         }
+                        buildOutputText = buildString {
+                            appendLine(if (success) "BUILD SUCCEEDED" else "BUILD FAILED")
+                            appendLine("Source: ${sourceFile.relativeTo(root).path}")
+                            appendLine("Output: ${outputFile.relativeTo(root).path}")
+                            appendLine("Compiler exit code: ${compileResult.exitCode}")
+                            if (!exported) appendLine("Export warning: ${exportResult.exceptionOrNull()?.message ?: "unknown error"}")
+                        }
+                        if (showingCompiler) logView.text = compilerLogText
                         statusView.text = when {
                             success && exported -> "Compile successful: ${outputFile.name}"
                             success -> "Compiled; export warning."
@@ -727,14 +774,18 @@ public OnPlayerConnect(playerid)
                         if (success && exported) toast("AMX generated and exported: ${outputFile.name}")
                         else if (success) toast("AMX generated; export failed.")
                     }.onFailure { error ->
-                        logView.text = "Compiler invocation failed.\n${error.message ?: error.javaClass.simpleName}"
+                        compilerLogText = "Compiler invocation failed.\n${error.message ?: error.javaClass.simpleName}"
+                        buildOutputText = "BUILD FAILED\n${error.message ?: error.javaClass.simpleName}"
+                        if (showingCompiler) logView.text = compilerLogText
                         statusView.text = "Compiler invocation failed."
                         toast("Compile failed.")
                     }
                 }
             }.start()
         } catch (error: Exception) {
-            logView.text = "Could not start compiler.\n${error.message ?: error.javaClass.simpleName}"
+            compilerLogText = "Could not start compiler.\n${error.message ?: error.javaClass.simpleName}"
+            buildOutputText = "BUILD FAILED\n${error.message ?: error.javaClass.simpleName}"
+            if (showingCompiler) logView.text = compilerLogText
             statusView.text = "Compiler setup failed."
             toast("Compile setup failed.")
         }
@@ -843,7 +894,7 @@ public OnPlayerConnect(playerid)
                         workspaceRoot = stagedRoot,
                         customRelativePaths = customIncludePaths.lines()
                     )
-                    logView.text = buildString {
+                    compilerLogText = buildString {
                         appendLine("Workspace prepared for Pawn compilation.")
                         appendLine("Project: ${stagedRoot.name}")
                         appendLine("Staged path: ${stagedRoot.absolutePath}")
@@ -855,8 +906,10 @@ public OnPlayerConnect(playerid)
                         appendLine("Quoted includes resolve relative to their containing source file.")
                         appendLine("Angle-bracket includes use the -i directories above.")
                         appendLine()
-                        appendLine("No compile was run: native Pawn Compiler is not integrated yet.")
+                        appendLine("Native Pawn compiler is integrated and ready.")
+                        appendLine("Select a .pwn gamemode, then use Build > Compile.")
                     }
+                    if (showingCompiler) logView.text = compilerLogText
                     statusView.text = "Workspace prepared: ${stagedRoot.name}"
                     toast("Workspace prepared.")
                 }.onFailure { error ->
@@ -960,25 +1013,50 @@ public OnPlayerConnect(playerid)
         val input = EditText(this).apply {
             hint = "Search in current file"
             setSingleLine(true)
+            setText(lastSearchText)
+            setSelection(text.length)
         }
         AlertDialog.Builder(this)
-            .setTitle("Search")
+            .setTitle("Find in file")
             .setView(input)
-            .setPositiveButton("Find") { _, _ ->
+            .setPositiveButton("Find next") { _, _ ->
                 val query = input.text.toString()
                 if (query.isNotBlank()) {
-                    val index = editor.text.toString().indexOf(query, ignoreCase = true)
-                    if (index >= 0) {
-                        editor.requestFocus()
-                        editor.setSelection(index, index + query.length)
-                        statusView.text = "Found: $query"
-                    } else {
-                        toast("Text not found.")
-                    }
+                    lastSearchText = query
+                    findText(query, forward = true)
                 }
             }
-            .setNegativeButton("Cancel", null)
+            .setNeutralButton("Find previous") { _, _ ->
+                val query = input.text.toString()
+                if (query.isNotBlank()) {
+                    lastSearchText = query
+                    findText(query, forward = false)
+                }
+            }
+            .setNegativeButton("Close", null)
             .show()
+    }
+
+    private fun findText(query: String, forward: Boolean) {
+        val source = editor.text.toString()
+        if (source.isEmpty()) return
+        val selectionStart = editor.selectionStart.coerceAtLeast(0)
+        val selectionEnd = editor.selectionEnd.coerceAtLeast(0)
+        val cursor = if (forward) maxOf(selectionStart, selectionEnd) else minOf(selectionStart, selectionEnd)
+        val match = if (forward) {
+            source.indexOf(query, cursor.coerceAtMost(source.length), ignoreCase = true)
+                .takeIf { it >= 0 } ?: source.indexOf(query, 0, ignoreCase = true)
+        } else {
+            source.lastIndexOf(query, (cursor - 1).coerceAtMost(source.length - 1), ignoreCase = true)
+                .takeIf { it >= 0 } ?: source.lastIndexOf(query, source.length - 1, ignoreCase = true)
+        }
+        if (match >= 0) {
+            editor.requestFocus()
+            editor.setSelection(match, match + query.length)
+            statusView.text = "Found at character ${match + 1}: $query"
+        } else {
+            toast("Text not found: $query")
+        }
     }
 
     private fun showAbout() {
@@ -994,7 +1072,213 @@ public OnPlayerConnect(playerid)
     }
 
     private fun updateTitle() {
-        titleView.text = "PawnForge — [$activeFileName]"
+        if (!::titleView.isInitialized) return
+        val modified = ::editor.isInitialized && editor.text.toString() != savedDocumentText
+        titleView.text = "PawnForge — [$activeFileName]${if (modified) " *" else ""}"
+        titleView.contentDescription = "PawnForge, $activeFileName${if (modified) ", unsaved changes" else ""}"
+    }
+
+    private fun replaceEditorContent(content: String) {
+        applyingHistory = true
+        try {
+            editor.setText(content)
+            editor.setSelection(editor.text.length)
+        } finally {
+            applyingHistory = false
+        }
+        editorHistory.clear()
+        pendingEditSnapshot = null
+        savedDocumentText = content
+        updateLineNumbers(editor.text)
+        updateTitle()
+        updateCursorStatus()
+    }
+
+    private fun markDocumentSaved() {
+        if (!::editor.isInitialized) return
+        savedDocumentText = editor.text.toString()
+        updateTitle()
+        updateCursorStatus()
+    }
+
+    private fun confirmBeforeReplacing(onContinue: () -> Unit) {
+        if (editor.text.toString() == savedDocumentText) {
+            onContinue()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Unsaved changes")
+            .setMessage("Save the current Pawn source before replacing it?")
+            .setPositiveButton("Discard") { _, _ -> onContinue() }
+            .setNeutralButton("Save") { _, _ -> saveDocument() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun currentEditorSnapshot() = EditorSnapshot(
+        editor.text.toString(),
+        editor.selectionStart.coerceAtLeast(0),
+        editor.selectionEnd.coerceAtLeast(0)
+    )
+
+    private fun applyEditorSnapshot(snapshot: EditorSnapshot) {
+        applyingHistory = true
+        try {
+            editor.setText(snapshot.text)
+            val start = snapshot.selectionStart.coerceIn(0, editor.text.length)
+            val end = snapshot.selectionEnd.coerceIn(0, editor.text.length)
+            editor.setSelection(minOf(start, end), maxOf(start, end))
+        } finally {
+            applyingHistory = false
+        }
+        updateLineNumbers(editor.text)
+        updateTitle()
+        updateCursorStatus()
+        applySyntaxHighlighting(editor.text)
+    }
+
+    private fun undoEditor() {
+        val previous = editorHistory.undo(currentEditorSnapshot())
+        if (previous == null) toast("Nothing to undo.") else applyEditorSnapshot(previous)
+    }
+
+    private fun redoEditor() {
+        val next = editorHistory.redo(currentEditorSnapshot())
+        if (next == null) toast("Nothing to redo.") else applyEditorSnapshot(next)
+    }
+
+    private fun updateCursorStatus() {
+        if (!::editor.isInitialized || !::statusView.isInitialized) return
+        val cursor = editor.selectionStart.coerceIn(0, editor.text.length)
+        val before = editor.text.subSequence(0, cursor).toString()
+        val line = before.count { it == '\\n' } + 1
+        val column = before.length - (before.lastIndexOf('\\n') + 1) + 1
+        val modified = editor.text.toString() != savedDocumentText
+        statusView.text = "Ln $line, Col $column${if (modified) "  •  Modified" else ""}"
+    }
+
+    private fun showEditMenu() {
+        val actions = arrayOf("Undo", "Redo", "Cut", "Copy", "Paste", "Select all", "Indent selection", "Unindent selection", "Insert Pawn callback")
+        AlertDialog.Builder(this)
+            .setTitle("Edit")
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> undoEditor()
+                    1 -> redoEditor()
+                    2 -> cutSelection()
+                    3 -> copySelection()
+                    4 -> pasteClipboard()
+                    5 -> editor.selectAll()
+                    6 -> transformSelectedLines(indent = true)
+                    7 -> transformSelectedLines(indent = false)
+                    8 -> showSnippetMenu()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun clipboardManager() = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+
+    private fun copySelection() {
+        val start = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val end = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        if (start == end) {
+            toast("Select code to copy.")
+            return
+        }
+        clipboardManager().setPrimaryClip(ClipData.newPlainText("Pawn source", editor.text.substring(start, end)))
+    }
+
+    private fun cutSelection() {
+        val start = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val end = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        if (start == end) {
+            toast("Select code to cut.")
+            return
+        }
+        val selected = editor.text.substring(start, end)
+        clipboardManager().setPrimaryClip(ClipData.newPlainText("Pawn source", selected))
+        editor.text.delete(start, end)
+    }
+
+    private fun pasteClipboard() {
+        val clip = clipboardManager().primaryClip ?: run {
+            toast("Clipboard is empty.")
+            return
+        }
+        if (clip.itemCount == 0) return
+        val text = clip.getItemAt(0).coerceToText(this)?.toString().orEmpty()
+        if (text.isEmpty()) return
+        val start = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val end = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        editor.text.replace(start, end, text)
+        editor.setSelection((start + text.length).coerceAtMost(editor.text.length))
+    }
+
+    private fun transformSelectedLines(indent: Boolean) {
+        val source = editor.text.toString()
+        val selectionStart = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val selectionEnd = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val startLine = source.lastIndexOf('\\n', (selectionStart - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
+        val nextNewline = source.indexOf('\\n', selectionEnd.coerceAtMost(source.length))
+        val endLine = if (nextNewline < 0) source.length else nextNewline
+        val block = source.substring(startLine, endLine)
+        val transformed = block.split('\\n').joinToString("\\n") { line ->
+            if (indent) "    $line" else when {
+                line.startsWith("    ") -> line.drop(4)
+                line.startsWith("\\t") -> line.drop(1)
+                line.startsWith(" ") -> line.drop(1)
+                else -> line
+            }
+        }
+        editor.text.replace(startLine, endLine, transformed)
+        editor.setSelection(startLine, (startLine + transformed.length).coerceAtMost(editor.text.length))
+    }
+
+    private fun showSnippetMenu() {
+        val labels = arrayOf("OnGameModeInit", "OnPlayerConnect", "OnPlayerDisconnect", "OnPlayerCommandText")
+        val snippets = arrayOf(
+            """public OnGameModeInit()
+{
+    print("[PawnForge] Gamemode loaded.");
+    return 1;
+}
+""",
+            """public OnPlayerConnect(playerid)
+{
+    SendClientMessage(playerid, 0xFFFFFFFF, "Welcome to the server!");
+    return 1;
+}
+""",
+            """public OnPlayerDisconnect(playerid, reason)
+{
+    return 1;
+}
+""",
+            """public OnPlayerCommandText(playerid, cmdtext[])
+{
+    if (!strcmp(cmdtext, "/hello", true))
+    {
+        SendClientMessage(playerid, 0xFFFFFFFF, "Hello!");
+        return 1;
+    }
+    return 0;
+}
+"""
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Insert Pawn callback")
+            .setItems(labels) { _, index -> insertSnippet(snippets[index]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun insertSnippet(snippet: String) {
+        val cursor = editor.selectionStart.coerceIn(0, editor.text.length)
+        editor.text.insert(cursor, snippet)
+        editor.setSelection((cursor + snippet.length).coerceAtMost(editor.text.length))
+        editor.requestFocus()
     }
 
     private fun updateLineNumbers(text: CharSequence?) {
