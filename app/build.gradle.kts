@@ -72,8 +72,11 @@ android {
 
     buildTypes {
         release {
-            if (releaseSigningReady) {
-                signingConfig = signingConfigs.getByName("release")
+            // For GitHub sideload builds, fall back to the CI debug key if no permanent publisher key is configured.
+            signingConfig = if (releaseSigningReady) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
             }
             isMinifyEnabled = false
             proguardFiles(
