@@ -1,6 +1,13 @@
 # Public Release Checklist
 
-PawnForge is not considered publicly released merely because CI can build an APK. Complete and verify every item below before publishing.
+PawnForge is distributed as a directly installable APK through free GitHub Releases. Google Play publication is optional. Complete these checks before calling a version stable.
+
+## Direct APK distribution
+
+- [ ] CI publishes the versioned `app-release.apk` to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest).
+- [ ] Verify the APK installs on Android 7.0 and Android 16.
+- [ ] Verify a release update installs over the previous version using the same signing certificate.
+- [ ] Configure a permanent signing keystore as described in [APK_DISTRIBUTION.md](APK_DISTRIBUTION.md). The temporary CI debug key is for initial sideload testing only.
 
 ## Build and signing
 
@@ -22,7 +29,7 @@ PawnForge is not considered publicly released merely because CI can build an APK
 - [ ] Validate representative SA-MP and open.mp projects, third-party includes, compiler errors, and generated AMX files.
 - [ ] Review crash logs, accessibility, app startup, and performance on low-memory devices.
 
-## Store publication
+## Optional Google Play publication
 
 - [ ] Host [PRIVACY_POLICY.md](PRIVACY_POLICY.md) at a stable public HTTPS URL and add that URL to the store listing.
 - [ ] Complete Play Console Data safety, content rating, target audience, app access, and app category declarations accurately.
@@ -31,4 +38,4 @@ PawnForge is not considered publicly released merely because CI can build an APK
 - [ ] Upload the signed AAB to an internal testing track first; review the Play pre-launch report before production rollout.
 - [ ] Publish release notes and keep a rollback/incident plan.
 
-The current CI artifacts are test/build outputs. A successful CI run does not replace physical-device testing, a signed-bundle check, legal/policy review, or Play Console approval.
+A successful GitHub Release does not replace physical-device testing, a persistent-signing-key backup, privacy review, or optional Play Console requirements.
