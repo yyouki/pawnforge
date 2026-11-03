@@ -99,8 +99,9 @@ jobs:
         with:
           api-level: 36
           arch: x86_64
-          target: aosp_atd
+          target: default
           emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
           script: gradle --no-daemon :app:connectedDebugAndroidTest
 
   publish-github-release:
