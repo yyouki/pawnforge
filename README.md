@@ -44,7 +44,7 @@ Implemented:
 
 Not implemented yet:
 - Full physical-device smoke testing and real-world SA-MP/open.mp project validation.
-- Multi-file tabs, complete project explorer, Replace All, structured compiler diagnostics with jump-to-line, completion, and a natives browser.
+- Multi-file tabs, complete project explorer, structured compiler diagnostics with jump-to-line, completion, and richer native documentation.
 
 The app reports success only when the native compiler exits successfully and the `.amx` file exists. Compiler warnings and errors are displayed from the compiler output log.
 
