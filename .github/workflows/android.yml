@@ -58,7 +58,8 @@ jobs:
             echo "PAWNFORGE_RELEASE_KEY_PASSWORD=$PAWNFORGE_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
             echo "::notice::Publisher signing key configured."
           else
-            echo "::warning::No publisher key configured; APK will use the temporary CI debug key. New builds will not be update-compatible until a persistent key is configured."
+            echo "::error::Permanent publisher signing key is required for trusted main-branch release builds. Add all four PAWNFORGE_* Actions secrets before merging."
+            exit 1
           fi
 
       - name: Verify compiler submodule
@@ -69,7 +70,13 @@ jobs:
 
       - name: Verify release APK signature
         run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          CERT_OUTPUT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)"
+          echo "$CERT_OUTPUT"
+          EXPECTED_CERT="FF:08:FC:90:48:1A:B2:73:13:4D:95:8A:41:5C:EB:58:C3:FA:14:0B:88:64:B0:E6:34:D6:48:03:80:59:92:AC"
+          grep -Fq "Signer #1 certificate SHA-256 digest: $EXPECTED_CERT" <<< "$CERT_OUTPUT" || {
+            echo "::error::The APK is not signed by the expected permanent PawnForge release certificate."
+            exit 1
+          }
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -107,7 +114,7 @@ jobs:
   publish-github-release:
     name: Publish free direct-download APK
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -163,4 +170,4 @@ jobs:
 
             Download **app-release.apk** and open it on your Android device. Android may ask you to allow installation from the file manager or browser that opened the APK.
 
-            This APK supports Android 7.0 (API 24) and newer. Keep the APK's signing key consistent for in-place updates. When no publisher key is configured, this build uses a temporary CI debug key; installing a later build may require uninstalling the previous version first.
+            This APK supports Android 7.0 (API 24) and newer and is signed with the permanent PawnForge release certificate. Future versions can update it in place using the same key.
