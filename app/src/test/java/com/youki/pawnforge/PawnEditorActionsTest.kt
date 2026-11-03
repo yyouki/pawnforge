@@ -45,6 +45,20 @@ class PawnEditorActionsTest {
     }
 
     @Test
+    fun indentSelectionEndingAtNextLineStartDoesNotChangeThatLine() {
+        val source = "first\nsecond"
+        val edit = PawnEditorActions.transformSelectedLines(source, 0, 6, indent = true)
+        assertEquals("    first\nsecond", edit.text)
+    }
+
+    @Test
+    fun unindentSelectionEndingAfterNewlineDoesNotChangeNextLine() {
+        val source = "    first\n    second"
+        val edit = PawnEditorActions.transformSelectedLines(source, 0, 10, indent = false)
+        assertEquals("first\n    second", edit.text)
+    }
+
+    @Test
     fun goToLineClampsToAvailableSource() {
         val source = "one();\ntwo();\nthree();"
         assertEquals(7, PawnEditorActions.offsetForLine(source, 2))
