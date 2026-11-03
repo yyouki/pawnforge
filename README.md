@@ -6,7 +6,7 @@ PawnForge is an Android-first Pawn editor for SA-MP and open.mp gamemode develop
 
 ![PawnForge logo](branding/pawnforge-logo.svg)
 
-The refreshed identity uses a geometric gold pawn, cyan code brackets, a deep-navy tile, and the PawnForge wordmark. No tagline is embedded in the artwork.
+The refreshed identity uses a hand-drawn pawn silhouette, warm parchment and terracotta accents, and a custom wordmark designed to stay readable on both light and dark pages. No tagline is embedded in the artwork.
 
 Android launcher and title bar use the matching vector logo from `app/src/main/res/drawable/ic_pawnforge_logo.xml`.
 
@@ -38,7 +38,7 @@ Implemented:
 - Project, Settings, and About navigation panels.
 - Persistent workspace-folder selection and configurable include directories.
 - Pawn `-i` include-path builder with default `pawno/include`, `qawno/include`, `include`, `includes`, `gamemode`, and workspace-root search folders.
-- GitHub Actions workflow that builds and uploads a debug APK.
+- GitHub Actions workflow that builds a debug APK and a signed, directly installable release APK.
 
 Not implemented yet:
 - Full physical-device smoke testing and real-world SA-MP/open.mp project validation.
@@ -48,7 +48,9 @@ The app reports success only when the native compiler exits successfully and the
 
 ## Release readiness
 
-CI builds a debug APK and a release AAB, then runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. The AAB is signed only when the upload-key secrets documented in [the public release checklist](docs/PUBLIC_RELEASE_CHECKLIST.md) are configured. Physical-device testing, a hosted privacy-policy URL, store listing assets, and Play Console submission still require the publisher.
+CI builds a debug APK and an installable release APK, verifies its signature, and runs instrumentation tests on Android 7.0 (API 24) and Android 16 (API 36) emulators. A successful push to `main` publishes the APK to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest), which provides free downloads for this public repository. No Play Store account or paid hosting is required for direct APK distribution.
+
+When no permanent publisher keystore is configured, CI signs the APK with its temporary debug key so it can be installed for testing. For in-place updates between releases, configure a permanent key using the steps in [APK distribution](docs/APK_DISTRIBUTION.md); without it, uninstalling the previous build may be required.
 
 ## Include handling
 
@@ -69,7 +71,7 @@ APK output:
 
     app/build/outputs/apk/debug/app-debug.apk
 
-Every push to main builds the native libraries, runs JVM tests, packages the APK, and starts an Android emulator smoke test that compiles a minimal Pawn source file. Download the artifact named `pawnforge-debug-apk` from the successful workflow run.
+Every push to main builds native libraries, runs JVM and Android emulator tests, verifies the release APK signature, and publishes a versioned APK to GitHub Releases when that version has not already been published. Pull requests build and test artifacts but never publish a release.
 
 ## Project structure
 
