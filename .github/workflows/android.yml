@@ -1,5 +1,10 @@
 name: Android build and compatibility
 
+# Avoid running several expensive emulator jobs for the same PR simultaneously.
+concurrency:
+  group: pawnforge-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
