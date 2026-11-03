@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build:
-    name: Build PawnForge APK and AAB
+    name: Build PawnForge APK
     runs-on: ubuntu-latest
 
     steps:
@@ -37,7 +37,9 @@ jobs:
         with:
           gradle-version: "8.11.1"
 
-      - name: Configure optional Play upload signing
+      # Never expose long-lived signing secrets while running code from a pull request.
+      - name: Configure publisher signing key
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         shell: bash
         env:
           PAWNFORGE_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PAWNFORGE_UPLOAD_KEYSTORE_BASE64 }}
@@ -49,21 +51,25 @@ jobs:
                 -n "$PAWNFORGE_RELEASE_STORE_PASSWORD" &&
                 -n "$PAWNFORGE_RELEASE_KEY_ALIAS" &&
                 -n "$PAWNFORGE_RELEASE_KEY_PASSWORD" ]]; then
-            printf '%s' "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pawnforge-upload-key.jks"
-            echo "PAWNFORGE_RELEASE_STORE_FILE=$RUNNER_TEMP/pawnforge-upload-key.jks" >> "$GITHUB_ENV"
+            printf '%s' "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pawnforge-release-key.jks"
+            echo "PAWNFORGE_RELEASE_STORE_FILE=$RUNNER_TEMP/pawnforge-release-key.jks" >> "$GITHUB_ENV"
             echo "PAWNFORGE_RELEASE_STORE_PASSWORD=$PAWNFORGE_RELEASE_STORE_PASSWORD" >> "$GITHUB_ENV"
             echo "PAWNFORGE_RELEASE_KEY_ALIAS=$PAWNFORGE_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
             echo "PAWNFORGE_RELEASE_KEY_PASSWORD=$PAWNFORGE_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
-            echo "::notice::Release AAB signing is configured."
+            echo "::notice::Publisher signing key configured."
           else
-            echo "::warning::Upload signing secrets are missing; the release AAB artifact will be unsigned."
+            echo "::warning::No publisher key configured; APK will use the temporary CI debug key. New builds will not be update-compatible until a persistent key is configured."
           fi
 
       - name: Verify compiler submodule
         run: test -f third_party/pawn-compiler-android/source/compiler/CMakeLists.txt
 
-      - name: Run unit tests and build APK/AAB
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:bundleRelease
+      - name: Run unit tests and build debug/release APKs
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
+
+      - name: Verify release APK signature
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -72,11 +78,11 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Upload release Android App Bundle
+      - name: Upload installable release APK
         uses: actions/upload-artifact@v4
         with:
-          name: pawnforge-release-aab
-          path: app/build/outputs/bundle/release/app-release.aab
+          name: pawnforge-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
 
       - name: Test Android 7.0 (API 24) compatibility
@@ -96,3 +102,64 @@ jobs:
           target: aosp_atd
           emulator-boot-timeout: 600
           script: gradle --no-daemon :app:connectedDebugAndroidTest
+
+  publish-github-release:
+    name: Publish free direct-download APK
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Skip an already-published version
+        id: release-check
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Release $RELEASE_TAG already exists; bump versionName before publishing another APK."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download release APK
+        if: steps.release-check.outputs.publish == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: pawnforge-release-apk
+          path: release-assets
+
+      - name: Publish GitHub Release
+        if: steps.release-check.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: PawnForge ${{ steps.version.outputs.version }}
+          files: release-assets/app-release.apk
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          body: |
+            Install PawnForge directly on Android. No Play Store account or paid hosting is required.
+
+            Download **app-release.apk** and open it on your Android device. Android may ask you to allow installation from the file manager or browser that opened the APK.
+
+            This APK supports Android 7.0 (API 24) and newer. Keep the APK's signing key consistent for in-place updates. When no publisher key is configured, this build uses a temporary CI debug key; installing a later build may require uninstalling the previous version first.
