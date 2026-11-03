@@ -18,6 +18,7 @@ Reference: https://github.com/openmultiplayer/qawno. The upstream project descri
 | Indent and Unindent selection | Available |
 | Find Next and Find Previous | Available with wraparound |
 | Pawn callback snippets | Available for common server callbacks |
+| Searchable native/signature browser | Available; scans local bundled and staged project `.inc` files |
 | Compiler and Output panels | Available and retain their text when switching tabs |
 | Adaptive launcher icon | Available on Android 8+; vector fallback on Android 7 |
 | Permanent APK signing | Prepared; repository Actions secrets must be configured by the publisher |
@@ -46,7 +47,7 @@ Reference: https://github.com/openmultiplayer/qawno. The upstream project descri
 2. Add a colour picker for 0xRRGGBBAA values.
 3. Add dark/light/system themes, adjustable font size, tab width, and editor spacing.
 4. Add recent projects, quick-open, project templates, and share/export actions.
-5. Add a native reference page with function signatures sourced from the selected local include set.
+5. Expand the native reference with multiline declarations, documentation comments, parameter hints, and jump-to-definition from include source locations.
 
 ## Architecture recommendations
 
