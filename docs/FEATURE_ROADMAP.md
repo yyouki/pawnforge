@@ -17,6 +17,7 @@ Reference: https://github.com/openmultiplayer/qawno. The upstream project descri
 | Cut, Copy, Paste, Select All | Available |
 | Indent and Unindent selection | Available |
 | Find Next and Find Previous | Available with wraparound |
+| Find & Replace and Replace All | Available with optional case-sensitive matching |
 | Pawn callback snippets | Available for common server callbacks |
 | Searchable native/signature browser | Available; scans local bundled and staged project `.inc` files |
 | Compiler and Output panels | Available and retain their text when switching tabs |
@@ -35,7 +36,7 @@ Reference: https://github.com/openmultiplayer/qawno. The upstream project descri
 
 ### P1 — Reach the useful Qawno/Pawno workflow
 
-1. Add full Find/Replace with case sensitivity, whole-word search, and Replace All.
+1. Extend Find/Replace with whole-word search, selection-only search, and a project-wide mode.
 2. Build autocomplete from the current source, project include files, and known SA-MP/open.mp symbols. Show parameter hints and a compact native/function browser.
 3. Add a larger snippet library: enum, player data, dialogs, timers, stock, public, forward, command callbacks, and common include templates.
 4. Add brace matching, code folding, a configurable formatter, and keyboard shortcuts for moving selected lines.
