@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">PawnForge Android app icon</title>
+  <desc id="desc">A crafted cream pawn silhouette with terracotta code brackets and forge sparks on a deep teal field.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#172F38"/>
+  <path d="M316 414l-72 98 72 98M708 414l72 98-72 98" fill="none" stroke="#D96E50" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M512 220c-76 0-132 56-132 130 0 59 36 106 89 122-12 42-35 74-70 108-46 44-77 89-91 158h408c-14-69-45-114-91-158-35-34-58-66-70-108 53-16 89-63 89-122 0-74-56-130-132-130z" fill="#F2E7D5"/>
+  <path d="M354 690c-50 12-83 42-101 83-10 23 3 47 28 53 147 35 311 34 461-5 25-7 36-32 20-54-23-34-58-55-105-66-95 24-206 23-303-11z" fill="#D96E50"/>
+  <path d="M278 794c144 37 322 35 468-7 26-8 48 8 49 31 1 21-15 37-38 44-157 45-335 47-497 8-25-6-39-24-33-47 6-22 25-35 51-29z" fill="#E3B66C"/>
+  <path d="M451 263c-27 24-42 56-42 91 0 34 12 64 34 87" fill="none" stroke="#FFFFFF" stroke-opacity=".6" stroke-width="20" stroke-linecap="round"/>
+  <path d="M736 245l18-51 22 49 51 18-49 22-18 51-22-49-51-18zM273 735l12-32 14 31 32 12-31 14-12 32-14-31-32-12z" fill="#E3B66C"/>
+</svg>

@@ -3,17 +3,33 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Release APKs use the publisher key when configured, otherwise the temporary CI debug key.
+val releaseStoreFile = System.getenv("PAWNFORGE_RELEASE_STORE_FILE")
+val releaseStorePassword = System.getenv("PAWNFORGE_RELEASE_STORE_PASSWORD")
+val releaseKeyAlias = System.getenv("PAWNFORGE_RELEASE_KEY_ALIAS")
+val releaseKeyPassword = System.getenv("PAWNFORGE_RELEASE_KEY_PASSWORD")
+val releaseSigningReady = listOf(
+    releaseStoreFile,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword
+).all { !it.isNullOrBlank() }
+
 android {
     namespace = "com.youki.pawnforge"
-    compileSdk = 35
+
+    buildFeatures {
+        buildConfig = true
+    }
+    compileSdk = 36
     ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.youki.pawnforge"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        targetSdk = 36
+        versionCode = 5
+        versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -47,8 +63,25 @@ android {
         jvmTarget = "17"
     }
 
+    signingConfigs {
+        if (releaseSigningReady) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
+            // For GitHub sideload builds, fall back to the CI debug key if no permanent publisher key is configured.
+            signingConfig = if (releaseSigningReady) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

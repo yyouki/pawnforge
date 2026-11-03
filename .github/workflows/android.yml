@@ -1,4 +1,9 @@
-name: Android APK
+name: Android build and compatibility
+
+# Avoid running several expensive emulator jobs for the same PR simultaneously.
+concurrency:
+  group: pawnforge-android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 on:
   push:
@@ -30,31 +35,163 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0 ndk;27.2.12479018 cmake;3.22.1
+          packages: platform-tools platforms;android-36 build-tools;36.0.0 ndk;27.2.12479018 cmake;3.22.1
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.11.1"
+
+      # Never expose long-lived signing secrets while running code from a pull request.
+      - name: Configure publisher signing key
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        shell: bash
+        env:
+          PAWNFORGE_UPLOAD_KEYSTORE_BASE64: ${{ secrets.PAWNFORGE_UPLOAD_KEYSTORE_BASE64 }}
+          PAWNFORGE_RELEASE_STORE_PASSWORD: ${{ secrets.PAWNFORGE_RELEASE_STORE_PASSWORD }}
+          PAWNFORGE_RELEASE_KEY_ALIAS: ${{ secrets.PAWNFORGE_RELEASE_KEY_ALIAS }}
+          PAWNFORGE_RELEASE_KEY_PASSWORD: ${{ secrets.PAWNFORGE_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" &&
+                -n "$PAWNFORGE_RELEASE_STORE_PASSWORD" &&
+                -n "$PAWNFORGE_RELEASE_KEY_ALIAS" &&
+                -n "$PAWNFORGE_RELEASE_KEY_PASSWORD" ]]; then
+            printf '%s' "$PAWNFORGE_UPLOAD_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/pawnforge-release-key.jks"
+            echo "PAWNFORGE_RELEASE_STORE_FILE=$RUNNER_TEMP/pawnforge-release-key.jks" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_STORE_PASSWORD=$PAWNFORGE_RELEASE_STORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_KEY_ALIAS=$PAWNFORGE_RELEASE_KEY_ALIAS" >> "$GITHUB_ENV"
+            echo "PAWNFORGE_RELEASE_KEY_PASSWORD=$PAWNFORGE_RELEASE_KEY_PASSWORD" >> "$GITHUB_ENV"
+            echo "::notice::Publisher signing key configured."
+          else
+            echo "::error::Permanent publisher signing key is required for trusted main-branch release builds. Add all four PAWNFORGE_* Actions secrets before merging."
+            exit 1
+          fi
 
       - name: Verify compiler submodule
         run: test -f third_party/pawn-compiler-android/source/compiler/CMakeLists.txt
 
-      - name: Run unit tests and build APK
-        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
+      - name: Run unit tests and build debug/release APKs
+        run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug :app:assembleRelease
 
-      - name: Upload APK
+      - name: Verify release APK signature
+        shell: bash
+        env:
+          EXPECTED_RELEASE_CERT_SHA256: ff08fc90481ab273134d958a415ceb58c3fa140b8864b0e634d64803805992ac
+        run: |
+          CERT_OUTPUT="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)"
+          echo "$CERT_OUTPUT"
+
+          # apksigner emits lowercase hexadecimal without separators; normalize defensively.
+          ACTUAL_CERT="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' <<< "$CERT_OUTPUT" | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          test -n "$ACTUAL_CERT" || {
+            echo "::error::Could not read APK signing certificate."
+            exit 1
+          }
+
+          if [[ "$GITHUB_REF" == "refs/heads/main" && "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+            if [[ "$ACTUAL_CERT" != "$EXPECTED_RELEASE_CERT_SHA256" ]]; then
+              echo "::error::The main-branch release APK is not signed by the permanent PawnForge publisher certificate."
+              exit 1
+            fi
+            echo "::notice::Permanent PawnForge publisher certificate verified."
+          else
+            echo "::notice::Pull-request APK signature verified. This is a test artifact, not a distributable release."
+          fi
+
+      - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: pawnforge-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      - name: Run native compiler smoke test
+      - name: Upload installable release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: pawnforge-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+
+      - name: Test Android 7.0 (API 24) compatibility
         uses: ReactiveCircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 24
           arch: x86_64
-          target: aosp_atd
+          target: default
           emulator-boot-timeout: 300
           script: gradle --no-daemon :app:connectedDebugAndroidTest
+
+      - name: Test Android 16 (API 36) compatibility
+        uses: ReactiveCircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          # Android Test Device image is optimized for headless CI emulator sessions.
+          target: aosp_atd
+          emulator-boot-timeout: 600
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 4096
+          script: gradle --no-daemon :app:connectedDebugAndroidTest
+
+  publish-github-release:
+    name: Publish free direct-download APK
+    needs: build
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the exact commit that built the APK
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether this version already has its APK
+        id: release-check
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A tag alone is not proof that a release and its APK asset were uploaded.
+          if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -Fxq "app-release.apk"; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Release $RELEASE_TAG already contains app-release.apk."
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Release $RELEASE_TAG is missing its APK; create or repair the release."
+          fi
+
+      - name: Download release APK
+        if: steps.release-check.outputs.publish == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: pawnforge-release-apk
+          path: release-assets
+
+      - name: Publish GitHub Release
+        if: steps.release-check.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: PawnForge ${{ steps.version.outputs.version }}
+          files: release-assets/app-release.apk
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          body: |
+            Install PawnForge directly on Android. No Play Store account or paid hosting is required.
+
+            Download **app-release.apk** and open it on your Android device. Android may ask you to allow installation from the file manager or browser that opened the APK.
+
+            This APK supports Android 7.0 (API 24) and newer and is signed with the permanent PawnForge release certificate. Future versions can update it in place using the same key.
