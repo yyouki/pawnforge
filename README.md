@@ -24,7 +24,7 @@ The compiler is built from [BagasZkyn/pawn-compiler-android](https://github.com/
 ## Android compatibility and display
 
 - Supports Android 7.0 (API 24) and newer; native libraries are packaged for `arm64-v8a`, `armeabi-v7a`, and `x86_64`.
-- Targets Android 16 (API 36) for current platform behavior and Google Play submission requirements.
+- Targets Android 16 (API 36) for current platform behavior. This also leaves the app compatible with future Play submission policies, but Play Store publication is optional.
 - Keeps the system status bar visible so the clock, Wi-Fi/mobile signal, and battery indicators remain available.
 - Applies Android 15/16 edge-to-edge insets so the editor starts below the status bar and remains clear of the navigation area and display cutouts.
 
