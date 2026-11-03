@@ -129,6 +129,7 @@ public OnPlayerConnect(playerid)
             setTextColor(Color.DKGRAY)
             gravity = Gravity.TOP or Gravity.RIGHT
             setPadding(dp(6), dp(9), dp(8), dp(8))
+            setLineSpacing(0f, 1.12f)
             setBackgroundColor(Color.rgb(235, 235, 235))
             minWidth = dp(40)
         }
@@ -150,15 +151,15 @@ public OnPlayerConnect(playerid)
             // Continue the current indentation when the soft or hardware keyboard inserts Enter.
             filters = arrayOf(InputFilter { source, start, end, dest, dstart, dend ->
                 val inserted = source.subSequence(start, end).toString()
-                if (inserted != "\\n" || dstart != dend) {
+                if (inserted != "\n" || dstart != dend) {
                     null
                 } else {
-                    val lineStart = dest.toString().lastIndexOf('\\n', (dstart - 1).coerceAtLeast(0))
+                    val lineStart = dest.toString().lastIndexOf('\n', dstart - 1)
                         .let { if (it < 0) 0 else it + 1 }
                     val currentLine = dest.subSequence(lineStart, dstart).toString()
-                    val indentation = currentLine.takeWhile { it == ' ' || it == '\\t' }
+                    val indentation = currentLine.takeWhile { it == ' ' || it == '\t' }
                     val extraIndent = if (currentLine.trimEnd().endsWith("{")) "    " else ""
-                    "\\n$indentation$extraIndent"
+                    "\n$indentation$extraIndent"
                 }
             })
         }
@@ -205,6 +206,9 @@ public OnPlayerConnect(playerid)
             }
         })
         editor.setOnClickListener { updateCursorStatus() }
+        editor.setOnScrollChangeListener { _, _, scrollY, _, _ ->
+            lineNumbers.scrollTo(0, scrollY)
+        }
         updateLineNumbers(editor.text)
         updateTitle()
         updateCursorStatus()
@@ -1184,8 +1188,8 @@ public OnPlayerConnect(playerid)
         if (!::editor.isInitialized || !::statusView.isInitialized) return
         val cursor = editor.selectionStart.coerceIn(0, editor.text.length)
         val before = editor.text.subSequence(0, cursor).toString()
-        val line = before.count { it == '\\n' } + 1
-        val column = before.length - (before.lastIndexOf('\\n') + 1) + 1
+        val line = before.count { it == '\n' } + 1
+        val column = before.length - (before.lastIndexOf('\n') + 1) + 1
         val modified = editor.text.toString() != savedDocumentText
         statusView.text = "Ln $line, Col $column${if (modified) "  •  Modified" else ""}"
     }
@@ -1253,14 +1257,14 @@ public OnPlayerConnect(playerid)
         val source = editor.text.toString()
         val selectionStart = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
         val selectionEnd = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
-        val startLine = source.lastIndexOf('\\n', (selectionStart - 1).coerceAtLeast(0)).let { if (it < 0) 0 else it + 1 }
-        val nextNewline = source.indexOf('\\n', selectionEnd.coerceAtMost(source.length))
+        val startLine = source.lastIndexOf('\n', selectionStart - 1).let { if (it < 0) 0 else it + 1 }
+        val nextNewline = source.indexOf('\n', selectionEnd.coerceAtMost(source.length))
         val endLine = if (nextNewline < 0) source.length else nextNewline
         val block = source.substring(startLine, endLine)
-        val transformed = block.split('\\n').joinToString("\\n") { line ->
+        val transformed = block.split('\n').joinToString("\n") { line ->
             if (indent) "    $line" else when {
                 line.startsWith("    ") -> line.drop(4)
-                line.startsWith("\\t") -> line.drop(1)
+                line.startsWith("\t") -> line.drop(1)
                 line.startsWith(" ") -> line.drop(1)
                 else -> line
             }
