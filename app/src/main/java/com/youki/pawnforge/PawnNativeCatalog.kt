@@ -56,7 +56,7 @@ internal object PawnNativeCatalog {
                 .onEnter { directory -> directory == root || directory.name !in excluded }
                 .filter { file ->
                     file.isFile && file.extension.equals("inc", ignoreCase = true) &&
-                        file.length() in 1..maxFileBytes
+                        file.length() > 0L && file.length() <= maxFileBytes
                 }
                 .take((maxFiles - visitedFiles).coerceAtLeast(0))
 
