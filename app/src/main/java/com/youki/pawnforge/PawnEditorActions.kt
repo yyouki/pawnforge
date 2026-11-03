@@ -86,6 +86,31 @@ internal object PawnEditorActions {
         return PawnTextEdit(result, blockStart, blockStart + transformed.length)
     }
 
+    fun transformSelectedLines(
+        source: String,
+        selectionStart: Int,
+        selectionEnd: Int,
+        indent: Boolean
+    ): PawnTextEdit {
+        val start = minOf(selectionStart, selectionEnd).coerceIn(0, source.length)
+        val end = maxOf(selectionStart, selectionEnd).coerceIn(start, source.length)
+        val lastIncludedPosition = if (end > start) end - 1 else start
+        val blockStart = lineStart(source, start)
+        // Use the last selected character, not the exclusive selection end.
+        val blockEnd = lineEndWithoutNewline(source, lastIncludedPosition)
+        val block = source.substring(blockStart, blockEnd)
+        val transformed = block.split('\n').joinToString("\n") { line ->
+            if (indent) "    $line" else when {
+                line.startsWith("    ") -> line.drop(4)
+                line.startsWith("\t") -> line.drop(1)
+                line.startsWith(" ") -> line.drop(1)
+                else -> line
+            }
+        }
+        val result = source.substring(0, blockStart) + transformed + source.substring(blockEnd)
+        return PawnTextEdit(result, blockStart, blockStart + transformed.length)
+    }
+
     fun lineStart(source: String, position: Int): Int {
         val cursor = position.coerceIn(0, source.length)
         val previousNewline = source.lastIndexOf('\n', cursor - 1)
