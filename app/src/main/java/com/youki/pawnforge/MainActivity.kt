@@ -26,6 +26,7 @@ import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import android.widget.EditText
 import android.widget.ArrayAdapter
+import android.widget.CheckBox
 import android.widget.ListView
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
@@ -443,6 +444,7 @@ public OnPlayerConnect(playerid)
                 KeyEvent.KEYCODE_S -> { saveDocument(); return true }
                 KeyEvent.KEYCODE_O -> { openDocument(); return true }
                 KeyEvent.KEYCODE_F -> { showSearchDialog(); return true }
+                KeyEvent.KEYCODE_H -> { showFindReplaceDialog(); return true }
                 KeyEvent.KEYCODE_X -> { cutSelection(); return true }
                 KeyEvent.KEYCODE_C -> { copySelection(); return true }
                 KeyEvent.KEYCODE_V -> { pasteClipboard(); return true }
@@ -475,7 +477,7 @@ public OnPlayerConnect(playerid)
                     }
                 }.show()
             "Edit" -> showEditMenu()
-            "Search" -> showSearchDialog()
+            "Search" -> showSearchMenu()
             "Build" -> runCompile()
             "Options" -> showSettings()
             "Help" -> showHelpMenu()
@@ -1053,6 +1055,20 @@ public OnPlayerConnect(playerid)
             ?: "selected folder"
     }
 
+    private fun showSearchMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("Search")
+            .setItems(arrayOf("Find...", "Find & Replace...", "Go to line...")) { _, which ->
+                when (which) {
+                    0 -> showSearchDialog()
+                    1 -> showFindReplaceDialog()
+                    2 -> showGoToLineDialog()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
     private fun showSearchDialog() {
         val input = EditText(this).apply {
             hint = "Search in current file"
@@ -1081,20 +1097,133 @@ public OnPlayerConnect(playerid)
             .show()
     }
 
+    private fun showFindReplaceDialog() {
+        val findInput = EditText(this).apply {
+            hint = "Find text"
+            setSingleLine(true)
+            setText(lastSearchText)
+        }
+        val replaceInput = EditText(this).apply {
+            hint = "Replace with"
+            setSingleLine(true)
+        }
+        val caseSensitive = CheckBox(this).apply {
+            text = "Match case"
+            isChecked = false
+        }
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(4))
+            addView(findInput, verticalParams(48))
+            addView(replaceInput, verticalParams(48))
+            addView(caseSensitive, verticalParams(44))
+        }
+
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Find & Replace")
+            .setView(form)
+            .setPositiveButton("Replace next", null)
+            .setNeutralButton("Replace all", null)
+            .setNegativeButton("Close", null)
+            .create()
+
+        // Keep the dialog open so multiple matches can be replaced in sequence.
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val query = findInput.text.toString()
+                val replacement = replaceInput.text.toString()
+                lastSearchText = query
+                replaceNextMatch(query, replacement, caseSensitive.isChecked)
+            }
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                val query = findInput.text.toString()
+                val replacement = replaceInput.text.toString()
+                lastSearchText = query
+                replaceAllMatches(query, replacement, caseSensitive.isChecked)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun replaceNextMatch(query: String, replacement: String, matchCase: Boolean) {
+        if (query.isEmpty()) {
+            toast("Enter text to find.")
+            return
+        }
+        val source = editor.text.toString()
+        val selectionStart = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val selectionEnd = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
+        val selectedText = source.substring(selectionStart, selectionEnd)
+        val currentMatch = selectionStart != selectionEnd &&
+            selectedText.equals(query, ignoreCase = !matchCase)
+        val matchStart = if (currentMatch) selectionStart else {
+            PawnFindReplace.findNext(
+                source = source,
+                query = query,
+                fromIndex = selectionEnd,
+                forward = true,
+                matchCase = matchCase
+            )
+        }
+
+        if (matchStart == null) {
+            toast("Text not found: $query")
+            return
+        }
+
+        editor.text.replace(matchStart, matchStart + query.length, replacement)
+        editor.requestFocus()
+        val cursorAfterReplacement = matchStart + replacement.length
+        val nextMatch = PawnFindReplace.findNext(
+            source = editor.text.toString(),
+            query = query,
+            fromIndex = cursorAfterReplacement,
+            forward = true,
+            matchCase = matchCase
+        )
+        if (nextMatch != null) {
+            editor.setSelection(nextMatch, nextMatch + query.length)
+            statusView.text = "Replaced one match; next match selected."
+        } else {
+            editor.setSelection(cursorAfterReplacement.coerceAtMost(editor.text.length))
+            statusView.text = "Replaced one match."
+        }
+    }
+
+    private fun replaceAllMatches(query: String, replacement: String, matchCase: Boolean) {
+        if (query.isEmpty()) {
+            toast("Enter text to find.")
+            return
+        }
+        val result = PawnFindReplace.replaceAll(
+            source = editor.text.toString(),
+            query = query,
+            replacement = replacement,
+            matchCase = matchCase
+        )
+        if (result.replacements == 0) {
+            toast("Text not found: $query")
+            return
+        }
+        editor.text.replace(0, editor.text.length, result.text)
+        editor.setSelection(editor.text.length)
+        statusView.text = "Replaced ${result.replacements} occurrence(s)."
+    }
+
     private fun findText(query: String, forward: Boolean) {
         val source = editor.text.toString()
         if (source.isEmpty()) return
         val selectionStart = editor.selectionStart.coerceAtLeast(0)
         val selectionEnd = editor.selectionEnd.coerceAtLeast(0)
         val cursor = if (forward) maxOf(selectionStart, selectionEnd) else minOf(selectionStart, selectionEnd)
-        val match = if (forward) {
-            source.indexOf(query, cursor.coerceAtMost(source.length), ignoreCase = true)
-                .takeIf { it >= 0 } ?: source.indexOf(query, 0, ignoreCase = true)
-        } else {
-            source.lastIndexOf(query, (cursor - 1).coerceAtMost(source.length - 1), ignoreCase = true)
-                .takeIf { it >= 0 } ?: source.lastIndexOf(query, source.length - 1, ignoreCase = true)
-        }
-        if (match >= 0) {
+        val match = PawnFindReplace.findNext(
+            source = source,
+            query = query,
+            fromIndex = cursor,
+            forward = forward,
+            matchCase = false
+        )
+        if (match != null) {
             editor.requestFocus()
             editor.setSelection(match, match + query.length)
             statusView.text = "Found at character ${match + 1}: $query"
