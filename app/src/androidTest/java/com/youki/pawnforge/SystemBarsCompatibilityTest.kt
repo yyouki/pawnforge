@@ -1,6 +1,7 @@
 package com.youki.pawnforge
 
 import android.content.Intent
+import android.graphics.Insets
 import android.os.Build
 import android.view.View
 import android.view.ViewGroup
@@ -42,22 +43,43 @@ class SystemBarsCompatibilityTest {
                 "dimen",
                 "android"
             )
+            val navigationBarResource = activity.resources.getIdentifier(
+                "navigation_bar_height",
+                "dimen",
+                "android"
+            )
             val statusBarHeight = if (statusBarResource != 0) {
                 activity.resources.getDimensionPixelSize(statusBarResource)
             } else {
-                0
+                24
+            }
+            val navigationBarHeight = if (navigationBarResource != 0) {
+                activity.resources.getDimensionPixelSize(navigationBarResource)
+            } else {
+                24
             }
 
             if (Build.VERSION.SDK_INT >= 35) {
-                val rootInsets = root.rootWindowInsets
-                assertTrue("The root view must receive window insets.", rootInsets != null)
-                val actualStatusBarInset = rootInsets!!.getInsets(
-                    WindowInsets.Type.statusBars()
-                ).top
-                assertTrue("The system must report a visible status-bar inset.", actualStatusBarInset > 0)
+                // Exercise the inset listener even on headless emulator images with no visible status-bar inset.
+                val simulatedSystemBars = WindowInsets.Builder()
+                    .setInsets(
+                        WindowInsets.Type.statusBars(),
+                        Insets.of(0, statusBarHeight, 0, 0)
+                    )
+                    .setInsets(
+                        WindowInsets.Type.navigationBars(),
+                        Insets.of(0, 0, 0, navigationBarHeight)
+                    )
+                    .build()
+
+                root.dispatchApplyWindowInsets(simulatedSystemBars)
                 assertTrue(
-                    "Edge-to-edge layout must reserve the actual status-bar inset.",
-                    root.paddingTop >= actualStatusBarInset
+                    "Edge-to-edge layout must reserve the supplied status-bar inset.",
+                    root.paddingTop >= statusBarHeight
+                )
+                assertTrue(
+                    "Edge-to-edge layout must reserve the supplied navigation-bar inset.",
+                    root.paddingBottom >= navigationBarHeight
                 )
             } else {
                 val location = IntArray(2)
