@@ -12,11 +12,11 @@ PawnForge is distributed as a directly installable APK through free GitHub Relea
 ## Build and signing
 
 - [ ] Configure the upload-key secrets in GitHub Actions:
-  - `PAWNFORGE_UPLOAD_KEYSTORE_BASE64`: base64-encoded upload keystore (JKS or PKCS12).
+  - `PAWNFORGE_UPLOAD_KEYSTORE_BASE64`: base64-encoded private publisher keystore (JKS or PKCS12).
   - `PAWNFORGE_RELEASE_STORE_PASSWORD`: keystore password.
   - `PAWNFORGE_RELEASE_KEY_ALIAS`: upload-key alias.
   - `PAWNFORGE_RELEASE_KEY_PASSWORD`: upload-key password.
-- [ ] Confirm the `pawnforge-release-aab` artifact is signed with the expected upload certificate.
+- [ ] Confirm `app-release.apk` is signed with the persistent publisher certificate.
 - [ ] Store an offline backup of the upload key and its recovery information. Never commit keystores or passwords.
 - [ ] Confirm the application ID, version code, version name, and signing certificate are the intended permanent release identity.
 - [ ] Keep the previous production signing and version metadata for future updates.
