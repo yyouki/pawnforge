@@ -37,7 +37,7 @@ Reference: https://github.com/openmultiplayer/qawno. The upstream project descri
 1. Add full Find/Replace with case sensitivity, whole-word search, and Replace All.
 2. Build autocomplete from the current source, project include files, and known SA-MP/open.mp symbols. Show parameter hints and a compact native/function browser.
 3. Add a larger snippet library: enum, player data, dialogs, timers, stock, public, forward, command callbacks, and common include templates.
-4. Add duplicate line/selection, toggle line/block comments, brace matching, code folding, and a configurable formatter.
+4. Add brace matching, code folding, a configurable formatter, and keyboard shortcuts for moving selected lines.
 5. Add compiler profiles with separate include sets and flags for SA-MP legacy and open.mp.
 
 ### P2 — Mobile-specific polish
