@@ -15,7 +15,7 @@ PawnForge is an offline-first Pawn source editor and compiler for Android.
 
 PawnForge uses Android's Storage Access Framework. You choose the files or project folder that the app may access. If you select a document provider that synchronizes with a third-party cloud service, that provider's own privacy terms govern its handling of the selected files.
 
-The app's automatic Android backup is disabled. Keep your own copy of important source files in a location you control.
+Automatic cloud backup is disabled through Android's backup setting on versions that honor that flag. Device-to-device transfer behavior can vary by Android version and manufacturer, so do not treat the setting as a guarantee that every migration excludes app data. Keep your own copy of important source files in a location you control.
 
 ## Data retention and deletion
 
