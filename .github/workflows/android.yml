@@ -136,10 +136,10 @@ jobs:
       contents: write
 
     steps:
-      - name: Checkout
+      - name: Checkout the exact commit that built the APK
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 1
 
       - name: Read app version
@@ -151,16 +151,19 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Skip an already-published version
+      - name: Check whether this version already has its APK
         id: release-check
         env:
           RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+          # A tag alone is not proof that a release and its APK asset were uploaded.
+          if gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' 2>/dev/null | grep -Fxq "app-release.apk"; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "Release $RELEASE_TAG already exists; bump versionName before publishing another APK."
+            echo "Release $RELEASE_TAG already contains app-release.apk."
           else
             echo "publish=true" >> "$GITHUB_OUTPUT"
+            echo "Release $RELEASE_TAG is missing its APK; create or repair the release."
           fi
 
       - name: Download release APK
