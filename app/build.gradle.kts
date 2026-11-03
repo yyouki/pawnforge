@@ -17,6 +17,10 @@ val releaseSigningReady = listOf(
 
 android {
     namespace = "com.youki.pawnforge"
+
+    buildFeatures {
+        buildConfig = true
+    }
     compileSdk = 36
     ndkVersion = "27.2.12479018"
 
