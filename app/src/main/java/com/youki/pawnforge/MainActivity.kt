@@ -24,6 +24,8 @@ import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
 import android.widget.EditText
+import android.widget.ArrayAdapter
+import android.widget.ListView
 import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -475,7 +477,7 @@ public OnPlayerConnect(playerid)
             "Search" -> showSearchDialog()
             "Build" -> runCompile()
             "Options" -> showSettings()
-            "Help" -> showAbout()
+            "Help" -> showHelpMenu()
         }
     }
 
@@ -1098,6 +1100,105 @@ public OnPlayerConnect(playerid)
         } else {
             toast("Text not found: $query")
         }
+    }
+
+    private fun showHelpMenu() {
+        AlertDialog.Builder(this)
+            .setTitle("Help")
+            .setItems(arrayOf("Pawn natives reference", "About PawnForge")) { _, which ->
+                if (which == 0) showNativeBrowser() else showAbout()
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun showNativeBrowser() {
+        val roots = mutableListOf<File>()
+        val bundledIncludes = runCatching { ensureCompilerIncludes() }.getOrNull()
+        if (bundledIncludes != null) roots.add(bundledIncludes)
+
+        stagedWorkspace?.takeIf { it.isDirectory }?.let { workspace ->
+            roots.addAll(
+                PawnIncludePaths.existingDirectories(
+                    workspaceRoot = workspace,
+                    customRelativePaths = customIncludePaths.lines()
+                )
+            )
+        }
+
+        val entries = PawnNativeCatalog.scan(roots.distinctBy { it.absolutePath })
+        if (entries.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("Pawn natives")
+                .setMessage("No one-line native declarations were found. Prepare a project workspace or add .inc files to its include folders.")
+                .setPositiveButton("OK", null)
+                .show()
+            return
+        }
+
+        val search = EditText(this).apply {
+            hint = "Search native name or signature"
+            setSingleLine(true)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        var filteredEntries = entries
+        val list = ListView(this)
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_list_item_1,
+            filteredEntries.map { entry -> entry.name + "  —  " + entry.signature }.toMutableList()
+        )
+        list.adapter = adapter
+
+        search.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim().orEmpty()
+                filteredEntries = if (query.isEmpty()) {
+                    entries
+                } else {
+                    entries.filter { entry ->
+                        entry.name.contains(query, ignoreCase = true) ||
+                            entry.signature.contains(query, ignoreCase = true) ||
+                            entry.sourcePath.contains(query, ignoreCase = true)
+                    }
+                }
+                adapter.clear()
+                adapter.addAll(filteredEntries.map { entry ->
+                    entry.name + "  —  " + entry.signature
+                })
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
+
+        list.setOnItemClickListener { _, _, position, _ ->
+            val entry = filteredEntries.getOrNull(position) ?: return@setOnItemClickListener
+            AlertDialog.Builder(this)
+                .setTitle(entry.name)
+                .setMessage(entry.signature + "\n\nInclude: " + entry.sourcePath)
+                .setPositiveButton("Insert name") { _, _ -> insertSnippet(entry.name) }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(search, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            addView(list, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(340)
+            ))
+            setPadding(dp(12), dp(4), dp(12), 0)
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Pawn natives (" + entries.size + ")")
+            .setView(panel)
+            .setNegativeButton("Close", null)
+            .show()
     }
 
     private fun showAbout() {
