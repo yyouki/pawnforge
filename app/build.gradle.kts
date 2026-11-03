@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// Release bundles are signed only when the upload-key secrets are configured in CI or locally.
+// Release APKs use the publisher key when configured, otherwise the temporary CI debug key.
 val releaseStoreFile = System.getenv("PAWNFORGE_RELEASE_STORE_FILE")
 val releaseStorePassword = System.getenv("PAWNFORGE_RELEASE_STORE_PASSWORD")
 val releaseKeyAlias = System.getenv("PAWNFORGE_RELEASE_KEY_ALIAS")
