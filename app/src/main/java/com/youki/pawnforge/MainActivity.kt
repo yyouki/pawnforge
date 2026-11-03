@@ -2,6 +2,7 @@ package com.youki.pawnforge
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.content.Intent
 import android.content.ClipboardManager
 import android.content.ClipData
@@ -1113,20 +1114,42 @@ public OnPlayerConnect(playerid)
     }
 
     private fun showNativeBrowser() {
-        val roots = mutableListOf<File>()
-        val bundledIncludes = runCatching { ensureCompilerIncludes() }.getOrNull()
-        if (bundledIncludes != null) roots.add(bundledIncludes)
-
-        stagedWorkspace?.takeIf { it.isDirectory }?.let { workspace ->
-            roots.addAll(
-                PawnIncludePaths.existingDirectories(
-                    workspaceRoot = workspace,
-                    customRelativePaths = customIncludePaths.lines()
-                )
-            )
+        val progress = ProgressDialog(this).apply {
+            setTitle("Pawn natives")
+            setMessage("Scanning bundled and project include files...")
+            setCancelable(false)
+            show()
         }
 
-        val entries = PawnNativeCatalog.scan(roots.distinctBy { it.absolutePath })
+        // Include discovery can touch hundreds of files, so keep it off the UI thread.
+        Thread {
+            val result = runCatching {
+                val roots = mutableListOf<File>()
+                val bundledIncludes = ensureCompilerIncludes()
+                roots.add(bundledIncludes)
+
+                stagedWorkspace?.takeIf { it.isDirectory }?.let { workspace ->
+                    roots.addAll(
+                        PawnIncludePaths.existingDirectories(
+                            workspaceRoot = workspace,
+                            customRelativePaths = customIncludePaths.lines()
+                        )
+                    )
+                }
+
+                PawnNativeCatalog.scan(roots.distinctBy { it.absolutePath })
+            }
+
+            runOnUiThread {
+                progress.dismiss()
+                result.onSuccess(::showNativeBrowserEntries).onFailure { error ->
+                    toast("Could not scan include files: ${error.message ?: "unknown error"}")
+                }
+            }
+        }.start()
+    }
+
+    private fun showNativeBrowserEntries(entries: List<PawnNativeEntry>) {
         if (entries.isEmpty()) {
             AlertDialog.Builder(this)
                 .setTitle("Pawn natives")
@@ -1154,14 +1177,10 @@ public OnPlayerConnect(playerid)
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
                 val query = s?.toString()?.trim().orEmpty()
-                filteredEntries = if (query.isEmpty()) {
-                    entries
-                } else {
-                    entries.filter { entry ->
-                        entry.name.contains(query, ignoreCase = true) ||
-                            entry.signature.contains(query, ignoreCase = true) ||
-                            entry.sourcePath.contains(query, ignoreCase = true)
-                    }
+                filteredEntries = if (query.isEmpty()) entries else entries.filter { entry ->
+                    entry.name.contains(query, ignoreCase = true) ||
+                        entry.signature.contains(query, ignoreCase = true) ||
+                        entry.sourcePath.contains(query, ignoreCase = true)
                 }
                 adapter.clear()
                 adapter.addAll(filteredEntries.map { entry ->
