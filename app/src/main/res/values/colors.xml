@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="pawnforge_icon_background">#172F38</color>
+    <color name="pawnforge_ink">#172F38</color>
+    <color name="pawnforge_terracotta">#D96E50</color>
+    <color name="pawnforge_parchment">#F2E7D5</color>
+    <color name="pawnforge_gold">#E3B66C</color>
+</resources>
