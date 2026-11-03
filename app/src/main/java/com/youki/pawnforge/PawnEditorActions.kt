@@ -27,10 +27,12 @@ internal object PawnEditorActions {
         val lineStart = lineStart(source, start)
         val lineEnd = lineEndIncludingNewline(source, start)
         val line = source.substring(lineStart, lineEnd)
-        val insertion = if (line.endsWith("\n")) line else "\n" + line
-        val duplicateStart = lineEnd + if (line.endsWith("\n")) 0 else 1
+        val hasTrailingNewline = line.endsWith("\n")
+        val insertion = if (hasTrailingNewline) line else "\n" + line
+        val duplicateStart = lineEnd + if (hasTrailingNewline) 0 else 1
+        val duplicatedTextLength = if (hasTrailingNewline) line.length - 1 else line.length
         val result = source.substring(0, lineEnd) + insertion + source.substring(lineEnd)
-        return PawnTextEdit(result, duplicateStart, duplicateStart + line.length)
+        return PawnTextEdit(result, duplicateStart, duplicateStart + duplicatedTextLength)
     }
 
     fun deleteLines(source: String, selectionStart: Int, selectionEnd: Int): PawnTextEdit {
