@@ -7,7 +7,7 @@ PawnForge is distributed as a directly installable APK through free GitHub Relea
 - [ ] CI publishes the versioned `app-release.apk` to [GitHub Releases](https://github.com/yyouki/pawnforge/releases/latest).
 - [ ] Verify the APK installs on Android 7.0 and Android 16.
 - [ ] Verify a release update installs over the previous version using the same signing certificate.
-- [ ] Configure a permanent signing keystore as described in [APK_DISTRIBUTION.md](APK_DISTRIBUTION.md). The temporary CI debug key is for initial sideload testing only.
+- [ ] Configure the provided permanent signing kit as described in [APK_SIGNING_MIGRATION.md](APK_SIGNING_MIGRATION.md). Main-branch release builds fail if the key is missing.
 
 ## Build and signing
 
@@ -16,7 +16,7 @@ PawnForge is distributed as a directly installable APK through free GitHub Relea
   - `PAWNFORGE_RELEASE_STORE_PASSWORD`: keystore password.
   - `PAWNFORGE_RELEASE_KEY_ALIAS`: upload-key alias.
   - `PAWNFORGE_RELEASE_KEY_PASSWORD`: upload-key password.
-- [ ] Confirm `app-release.apk` is signed with the persistent publisher certificate.
+- [ ] Confirm `app-release.apk` has the expected permanent SHA-256 certificate fingerprint from [APK_SIGNING_MIGRATION.md](APK_SIGNING_MIGRATION.md).
 - [ ] Store an offline backup of the upload key and its recovery information. Never commit keystores or passwords.
 - [ ] Confirm the application ID, version code, version name, and signing certificate are the intended permanent release identity.
 - [ ] Keep the previous production signing and version metadata for future updates.
