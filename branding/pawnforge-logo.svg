@@ -1,37 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="320" viewBox="0 0 960 320" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="320" viewBox="0 0 1040 320" role="img" aria-labelledby="title desc">
   <title id="title">PawnForge</title>
-  <desc id="desc">A modern gold pawn framed by cyan code brackets on a deep navy tile, beside the PawnForge wordmark.</desc>
-  <defs>
-    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#123B5B"/>
-      <stop offset="1" stop-color="#07182B"/>
-    </linearGradient>
-    <linearGradient id="gold" x1="0" y1="0" x2="0.8" y2="1">
-      <stop offset="0" stop-color="#FFE6A2"/>
-      <stop offset="1" stop-color="#E7A63A"/>
-    </linearGradient>
-    <linearGradient id="cyan" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6CE7DE"/>
-      <stop offset="1" stop-color="#32AFC7"/>
-    </linearGradient>
-  </defs>
+  <desc id="desc">A bespoke chess pawn mark with anvil-like base and small forge spark, beside a custom-styled PawnForge wordmark.</desc>
 
-  <g transform="translate(20 20)">
-    <rect width="280" height="280" rx="58" fill="url(#tile)"/>
-    <rect x="1.5" y="1.5" width="277" height="277" rx="56.5" fill="none" stroke="#3C7590" stroke-opacity=".45" stroke-width="3"/>
-    <path d="M88 76 49 140l39 64M192 76l39 64-39 64" fill="none" stroke="url(#cyan)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
-    <circle cx="140" cy="78" r="28" fill="url(#gold)"/>
-    <path d="M108 119c7-15 18-22 32-22s25 7 32 22l-9 43 29 40 8 24H89l8-24 29-40z" fill="url(#gold)"/>
-    <path d="M97 207h86l18 17v12H79v-12z" fill="#C98A32"/>
-    <path d="M112 190h56" stroke="#FFF4D5" stroke-width="5" stroke-linecap="round" opacity=".72"/>
-    <path d="M104 231h72" stroke="#FFF4D5" stroke-width="4" stroke-linecap="round" opacity=".42"/>
-    <path d="M136 28h8M136 252h8" stroke="#55DCD3" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+  <g transform="translate(18 18)">
+    <rect width="284" height="284" rx="52" fill="#172F38"/>
+    <path d="M38 79c14-20 29-32 50-39" fill="none" stroke="#D96E50" stroke-width="5" stroke-linecap="round"/>
+    <path d="M231 202c7 10 11 19 13 29" fill="none" stroke="#D6A45D" stroke-width="4" stroke-linecap="round"/>
+    <path d="M218 54l6-11m8 19 12-3" fill="none" stroke="#D96E50" stroke-width="5" stroke-linecap="round"/>
+
+    <!-- Hand-drawn pawn: intentionally sculpted with soft, slightly asymmetric curves. -->
+    <path d="M139 53c-17 0-30 13-30 29 0 13 8 24 20 28-3 9-8 16-15 23-10 9-17 17-20 30h90c-3-13-10-21-20-30-7-7-12-14-15-23 12-4 20-15 20-28 0-16-13-29-30-29z"
+      fill="#F2E7D5"/>
+    <path d="M116 149c-14 12-24 26-28 45-2 8 2 15 10 17 14 4 27 6 42 6 17 0 34-2 49-7 7-2 10-9 8-16-5-19-15-34-29-46"
+      fill="#F2E7D5"/>
+    <path d="M97 205c-11 2-20 8-25 17-3 6 1 12 8 13 38 7 79 7 119-1 7-1 10-8 6-14-6-9-15-14-27-16"
+      fill="#D96E50"/>
+    <path d="M82 239c34 8 83 8 121-1 7-2 13 2 14 8 1 7-4 12-11 14-40 9-87 9-129 1-8-2-12-7-10-14 1-6 7-9 15-8z"
+      fill="#E3B66C"/>
+
+    <!-- Small hand-cut highlight, not a stock gradient or glossy effect. -->
+    <path d="M119 67c-5 5-8 12-8 19 0 8 3 14 8 19" fill="none" stroke="#FFFFFF" stroke-opacity=".72" stroke-width="4" stroke-linecap="round"/>
+    <path d="M113 166c-7 8-11 17-12 27" fill="none" stroke="#FFFFFF" stroke-opacity=".48" stroke-width="4" stroke-linecap="round"/>
+    <path d="M147 39l4-10m10 14 10-7" fill="none" stroke="#E3B66C" stroke-width="4" stroke-linecap="round"/>
   </g>
 
-  <g transform="translate(350 0)">
-    <text x="0" y="160" font-family="Inter,Manrope,Segoe UI,Arial,sans-serif" font-size="104" font-weight="760" letter-spacing="-5" fill="#F0F5FC">Pawn<tspan fill="#53C9D1">Forge</tspan></text>
-    <path d="M4 198h420" stroke="#254867" stroke-width="5" stroke-linecap="round"/>
-    <path d="M4 198h120" stroke="#E9B451" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="440" cy="198" r="4" fill="#53C9D1"/>
+  <g transform="translate(356 0)">
+    <text x="0" y="151" font-family="Trebuchet MS, Avenir Next, Segoe UI, sans-serif" font-size="106" font-weight="700" letter-spacing="-5" fill="#193641">Pawn<tspan fill="#B85C43">Forge</tspan></text>
+    <path d="M8 184c81 4 183 4 278 0" fill="none" stroke="#D6A45D" stroke-width="5" stroke-linecap="round"/>
+    <path d="M298 184c35-1 71-3 108-7" fill="none" stroke="#B85C43" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="418" cy="176" r="4" fill="#193641"/>
   </g>
 </svg>
