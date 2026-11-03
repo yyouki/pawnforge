@@ -55,6 +55,7 @@ class MainActivity : Activity() {
     private var showingCompiler = true
     private val editorHistory = EditorHistory()
     private var pendingEditSnapshot: EditorSnapshot? = null
+    private var pendingSaveCallback: (() -> Unit)? = null
     private var applyingHistory = false
     private var savedDocumentText = PAWN_SAMPLE
     private var compilerLogText = initialCompilerLog()
@@ -262,7 +263,9 @@ public OnPlayerConnect(playerid)
             val left = maxOf(systemBars.left, cutout?.safeInsetLeft ?: 0)
             val top = maxOf(systemBars.top, cutout?.safeInsetTop ?: 0)
             val right = maxOf(systemBars.right, cutout?.safeInsetRight ?: 0)
-            val bottom = maxOf(systemBars.bottom, cutout?.safeInsetBottom ?: 0)
+            // Include the software keyboard so editor controls are not covered while typing.
+            val ime = insets.getInsets(WindowInsets.Type.ime())
+            val bottom = maxOf(systemBars.bottom, cutout?.safeInsetBottom ?: 0, ime.bottom)
 
             // Keep all app controls inside the usable screen area.
             view.setPadding(left, top, right, bottom)
@@ -505,7 +508,7 @@ public OnPlayerConnect(playerid)
         }
     }
 
-    private fun saveDocument() {
+    private fun saveDocument(onSaved: (() -> Unit)? = null) {
         val stagedFile = currentSourceFile
         if (stagedFile != null) {
             try {
@@ -516,11 +519,12 @@ public OnPlayerConnect(playerid)
                 if (root == null || selectedFolder == null) {
                     statusView.text = "Saved in staged workspace only."
                     toast("Saved locally; reconnect the project folder to sync it.")
+                    onSaved?.invoke()
                     return
                 }
 
                 statusView.text = "Saving to project folder..."
-                // Save the editor buffer locally, then mirror that file to the SAF folder.
+                // Only continue a pending Open/New action after the external project copy succeeds.
                 Thread {
                     val export = runCatching {
                         WorkspaceExporter(contentResolver).exportFiles(
@@ -533,6 +537,7 @@ public OnPlayerConnect(playerid)
                         export.onSuccess {
                             statusView.text = "Saved: $activeFileName"
                             toast("Project file saved.")
+                            onSaved?.invoke()
                         }.onFailure { error ->
                             statusView.text = "Saved locally; project sync failed."
                             toast("Local save OK; sync failed: ${error.message ?: "unknown error"}")
@@ -546,10 +551,11 @@ public OnPlayerConnect(playerid)
         }
 
         val uri = currentUri
-        if (uri == null) saveDocumentAs() else writeToUri(uri)
+        if (uri == null) saveDocumentAs(onSaved) else writeToUri(uri, onSaved)
     }
 
-    private fun saveDocumentAs() {
+    private fun saveDocumentAs(onSaved: (() -> Unit)? = null) {
+        pendingSaveCallback = onSaved
         val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "text/plain"
@@ -561,8 +567,14 @@ public OnPlayerConnect(playerid)
     @Deprecated("Uses Activity Result API compatibility for a dependency-free first build.")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (resultCode != RESULT_OK) return
-        val uri = data?.data ?: return
+        if (resultCode != RESULT_OK) {
+            if (requestCode == REQUEST_SAVE_FILE) pendingSaveCallback = null
+            return
+        }
+        val uri = data?.data ?: run {
+            if (requestCode == REQUEST_SAVE_FILE) pendingSaveCallback = null
+            return
+        }
 
         when (requestCode) {
             REQUEST_OPEN_FILE -> {
@@ -584,7 +596,9 @@ public OnPlayerConnect(playerid)
             REQUEST_SAVE_FILE -> {
                 currentUri = uri
                 currentSourceFile = null
-                writeToUri(uri)
+                val callback = pendingSaveCallback
+                pendingSaveCallback = null
+                writeToUri(uri, callback)
             }
             REQUEST_OPEN_WORKSPACE -> {
                 try {
@@ -607,7 +621,7 @@ public OnPlayerConnect(playerid)
         }
     }
 
-    private fun writeToUri(uri: Uri) {
+    private fun writeToUri(uri: Uri, onSaved: (() -> Unit)? = null) {
         try {
             contentResolver.openOutputStream(uri, "wt")?.bufferedWriter(Charsets.UTF_8)?.use {
                 it.write(editor.text.toString())
@@ -617,6 +631,7 @@ public OnPlayerConnect(playerid)
             markDocumentSaved()
             statusView.text = "Saved: $activeFileName"
             toast("File saved.")
+            onSaved?.invoke()
         } catch (error: Exception) {
             toast("Save failed: ${error.message ?: "unknown error"}")
         }
@@ -1400,7 +1415,7 @@ public OnPlayerConnect(playerid)
             .setTitle("Unsaved changes")
             .setMessage("Save the current Pawn source before replacing it?")
             .setPositiveButton("Discard") { _, _ -> onContinue() }
-            .setNeutralButton("Save") { _, _ -> saveDocument() }
+            .setNeutralButton("Save") { _, _ -> saveDocument(onSaved = onContinue) }
             .setNegativeButton("Cancel", null)
             .show()
     }
@@ -1587,23 +1602,13 @@ public OnPlayerConnect(playerid)
     }
 
     private fun transformSelectedLines(indent: Boolean) {
-        val source = editor.text.toString()
-        val selectionStart = minOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
-        val selectionEnd = maxOf(editor.selectionStart, editor.selectionEnd).coerceAtLeast(0)
-        val startLine = source.lastIndexOf('\n', selectionStart - 1).let { if (it < 0) 0 else it + 1 }
-        val nextNewline = source.indexOf('\n', selectionEnd.coerceAtMost(source.length))
-        val endLine = if (nextNewline < 0) source.length else nextNewline
-        val block = source.substring(startLine, endLine)
-        val transformed = block.split('\n').joinToString("\n") { line ->
-            if (indent) "    $line" else when {
-                line.startsWith("    ") -> line.drop(4)
-                line.startsWith("\t") -> line.drop(1)
-                line.startsWith(" ") -> line.drop(1)
-                else -> line
-            }
-        }
-        editor.text.replace(startLine, endLine, transformed)
-        editor.setSelection(startLine, (startLine + transformed.length).coerceAtMost(editor.text.length))
+        val edit = PawnEditorActions.transformSelectedLines(
+            source = editor.text.toString(),
+            selectionStart = editor.selectionStart.coerceAtLeast(0),
+            selectionEnd = editor.selectionEnd.coerceAtLeast(0),
+            indent = indent
+        )
+        applyTextEdit(edit)
     }
 
     private fun showSnippetMenu() {
